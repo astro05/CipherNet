@@ -129,6 +129,15 @@ to .NET's default — so round-trips match byte-for-byte.
   > attach the debugger to a tab that already has DevTools open. Use Chrome's own
   > Network panel for bandwidth shaping; **Offline** is fully functional here.
 
+### Appearance
+
+- **Auto theme** — the panel follows the host theme automatically. When
+  DevTools (or the browser) is in dark mode the panel is dark; in light mode it
+  switches to a light palette that mirrors Chrome's light Network panel. It reads
+  `chrome.devtools.panels.themeName` (falling back to the
+  `prefers-color-scheme` media query) and re-themes live when you flip the
+  DevTools theme — no reload needed.
+
 ## Not yet implemented (from `docs/PRD.md`)
 
 This extension covers capture, a resizable request table (resize/reorder/hide/

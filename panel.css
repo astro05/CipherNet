@@ -1,4 +1,8 @@
+/* Dark is the default; panel.js adds data-theme="light" on <html> when the
+   DevTools/browser theme is light. Every color below is a variable so the
+   light override (next block) is the only place that needs to change. */
 :root {
+  color-scheme: dark;
   --bg: #1e1e1e;
   --bg2: #252526;
   --bg3: #2d2d30;
@@ -8,6 +12,7 @@
   --accent: #4ec9b0;
   --sel: #0a3b5c;
   --sel-fg: #ffffff;
+  --sel-hover: #155a85;
   --get: #4fc1ff;
   --post: #c586c0;
   --err: #f48771;
@@ -17,6 +22,52 @@
   --tok-num: #b5cea8;
   --tok-bool: #569cd6;
   --tok-null: #569cd6;
+  --hover: #3a3a3d;
+  --row-border: #2a2a2a;
+  --stripe: rgba(255, 255, 255, 0.02);
+  --branch-hover: rgba(255, 255, 255, 0.04);
+  --tree-line: #3a3a3a;
+  --img-bg: rgba(255, 255, 255, 0.2);
+  --shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --hl-bg: #5c4b00;
+  --hl-fg: #ffe9a8;
+  --hl-cur-bg: #c08a00;
+  --hl-cur-fg: #1e1e1e;
+}
+
+/* Light theme — mirrors Chrome DevTools' light Network panel. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg2: #f3f3f3;
+  --bg3: #ececec;
+  --border: #cdcdcd;
+  --fg: #202124;
+  --muted: #5f6368;
+  --accent: #1a73e8;
+  --sel: #cfe8fc;
+  --sel-fg: #202124;
+  --sel-hover: #aacdf3;
+  --get: #1a73e8;
+  --post: #9334e6;
+  --err: #d93025;
+  --ok: #188038;
+  --tok-key: #0451a5;
+  --tok-str: #a31515;
+  --tok-num: #098658;
+  --tok-bool: #0000ff;
+  --tok-null: #0000ff;
+  --hover: #e4e4e4;
+  --row-border: #ededed;
+  --stripe: rgba(0, 0, 0, 0.025);
+  --branch-hover: rgba(0, 0, 0, 0.04);
+  --tree-line: #d4d4d4;
+  --img-bg: rgba(0, 0, 0, 0.06);
+  --shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  --hl-bg: #fff3a3;
+  --hl-fg: #5c4b00;
+  --hl-cur-bg: #ffce44;
+  --hl-cur-fg: #202124;
 }
 
 * { box-sizing: border-box; }
@@ -59,7 +110,7 @@ body { display: flex; flex-direction: column; }
   background: var(--bg3);
   border: 1px solid var(--border);
   border-radius: 4px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow);
   min-width: 170px;
   padding: 4px;
 }
@@ -73,7 +124,7 @@ body { display: flex; flex-direction: column; }
   padding: 5px 8px;
   border-radius: 3px;
 }
-.menu button:hover { background: #3a3a3d !important; }
+.menu button:hover { background: var(--hover) !important; }
 .menu label {
   display: flex;
   align-items: center;
@@ -83,9 +134,9 @@ body { display: flex; flex-direction: column; }
   cursor: pointer;
   white-space: nowrap;
 }
-.menu label:hover { background: #3a3a3d; }
+.menu label:hover { background: var(--hover); }
 .menu label.active { background: var(--sel); color: var(--sel-fg); }
-.menu label.active:hover { background: #155a85; }
+.menu label.active:hover { background: var(--sel-hover); }
 .menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
 
 /* resource-type filter pills */
@@ -112,7 +163,7 @@ body { display: flex; flex-direction: column; }
   background: var(--bg3);
   border: 1px solid var(--border);
   border-radius: 4px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--shadow);
   padding: 4px;
   min-width: 150px;
 }
@@ -126,7 +177,7 @@ body { display: flex; flex-direction: column; }
   cursor: pointer;
   white-space: nowrap;
 }
-.col-menu label:hover { background: #3a3a3d; }
+.col-menu label:hover { background: var(--hover); }
 .col-menu .reset {
   border: none;
   background: transparent;
@@ -148,7 +199,7 @@ body { display: flex; flex-direction: column; }
   padding: 3px 8px;
   cursor: pointer;
 }
-#toolbar button:hover { background: #3a3a3d; }
+#toolbar button:hover { background: var(--hover); }
 #toolbar button.ghost { background: transparent; }
 #toolbar button.record { color: var(--muted); font-size: 13px; line-height: 1; }
 #toolbar button.record.recording { color: var(--err); }
@@ -234,14 +285,14 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; -webkit-
 .col-grip:hover { background: var(--accent); }
 #reqTable td {
   padding: 3px 8px;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--row-border);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 #reqBody tr { cursor: pointer; }
-#reqBody tr:nth-child(even) { background: rgba(255, 255, 255, 0.02); }
+#reqBody tr:nth-child(even) { background: var(--stripe); }
 #reqBody tr:hover { background: var(--bg2); }
 #reqBody tr.selected,
 #reqBody tr.selected:hover { background: var(--sel); color: var(--sel-fg); }
@@ -354,24 +405,24 @@ pre.body .note { color: var(--muted); }
 
 /* search highlight */
 mark.hl {
-  background: #5c4b00;
-  color: #ffe9a8;
+  background: var(--hl-bg);
+  color: var(--hl-fg);
   border-radius: 2px;
 }
-mark.hl.current { background: #c08a00; color: #1e1e1e; }
+mark.hl.current { background: var(--hl-cur-bg); color: var(--hl-cur-fg); }
 
 /* ------------------------------ JSON tree ------------------------------ */
 .preview-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
 .jt { font-family: Consolas, monospace; font-size: 12px; line-height: 1.55; }
-.jt-children { padding-left: 14px; border-left: 1px dotted #3a3a3a; margin-left: 4px; }
+.jt-children { padding-left: 14px; border-left: 1px dotted var(--tree-line); margin-left: 4px; }
 .jt-row { display: flex; gap: 4px; align-items: baseline; white-space: pre-wrap; word-break: break-word; }
 .jt-branch { cursor: pointer; }
-.jt-branch:hover { background: rgba(255, 255, 255, 0.04); }
+.jt-branch:hover { background: var(--branch-hover); }
 .jt-tri { width: 12px; flex: 0 0 auto; color: var(--muted); }
 .jt-tri-spacer { width: 12px; flex: 0 0 auto; }
 .jt-key { color: var(--tok-key); }
 .jt-meta { color: var(--muted); }
-.preview-img { max-width: 100%; background: #fff3; padding: 6px; border-radius: 4px; }
+.preview-img { max-width: 100%; background: var(--img-bg); padding: 6px; border-radius: 4px; }
 
 /* ------------------------------- timing -------------------------------- */
 .timing-grid { display: grid; grid-template-columns: 150px 1fr 80px; gap: 4px 10px; align-items: center; }
@@ -392,7 +443,7 @@ mark.hl.current { background: #c08a00; color: #1e1e1e; }
 .dtable th, .dtable td {
   text-align: left;
   padding: 3px 8px;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--row-border);
   vertical-align: top;
   word-break: break-all;
 }

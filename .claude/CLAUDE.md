@@ -8,3 +8,4 @@ When implementing:
 2. Create a plan.
 3. Implement one feature at a time.
 4. Update documentation.
+5. Update the version no.
