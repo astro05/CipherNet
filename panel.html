@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <div id="toolbar">
+      <div class="tb-row">
+        <img id="logo" src="icon16.png" alt="CipherNet" title="CipherNet" />
+        <button id="pauseBtn" class="record recording" title="Stop / resume capturing">●</button>
+        <button id="clearBtn" title="Clear the list">🗑</button>
+        <span class="sep"></span>
+        <label class="chk" title="Keep requests across page navigations"><input type="checkbox" id="preserveLog" /> Preserve log</label>
+        <label class="chk" title="Disable HTTP cache for the inspected tab"><input type="checkbox" id="disableCache" /> Disable cache</label>
+        <select id="throttle" title="Network throttling"></select>
+        <span id="throttleNote" class="muted"></span>
+        <span class="sep"></span>
+        <button id="searchToggle" class="ghost" title="Search (Ctrl+F)">🔍</button>
+        <input id="filter" type="text" placeholder="Filter — e.g. method:POST status-code:200 larger-than:10k" />
+        <label class="chk"><input type="checkbox" id="onlyApi" /> Encrypted only</label>
+        <span class="sep"></span>
+        <div class="menu-wrap">
+          <button id="exportBtn" class="ghost" title="Export captured requests">⬇ Export ▾</button>
+          <div id="exportMenu" class="menu" hidden>
+            <button data-fmt="har">HAR (.har)</button>
+            <button data-fmt="json">JSON</button>
+            <button data-fmt="csv">CSV</button>
+            <button data-fmt="decrypted">Decrypted session</button>
+          </div>
+        </div>
+        <button id="keysToggle" class="ghost" title="Key settings">🔑 Key</button>
+        <span id="count" class="count">0 requests</span>
+      </div>
+      <div class="tb-row search" id="searchRow">
+        <input id="searchInput" type="text" placeholder="Search URL, headers, cookies, request & response (incl. decrypted)…" />
+        <button id="searchPrev" class="ghost" title="Previous match (Shift+Enter)">▲</button>
+        <button id="searchNext" class="ghost" title="Next match (Enter)">▼</button>
+        <label class="chk" title="Regular expression"><input type="checkbox" id="optRegex" /> .*</label>
+        <label class="chk" title="Match case"><input type="checkbox" id="optCase" /> Aa</label>
+        <label class="chk" title="Whole word"><input type="checkbox" id="optWord" /> ⌷W</label>
+        <span id="searchStatus" class="muted"></span>
+        <button id="searchClose" class="ghost" title="Close (Esc)">✕</button>
+      </div>
+      <div class="tb-row filters-row">
+        <div class="menu-wrap">
+          <button id="moreFiltersBtn" class="ghost" title="More filters">More filters ▾</button>
+          <div id="moreFiltersMenu" class="menu" hidden>
+            <label><input type="checkbox" data-mf="hideData" /> Hide data URLs</label>
+            <label><input type="checkbox" data-mf="hideExt" /> Hide extension URLs</label>
+            <div class="menu-sep"></div>
+            <label><input type="checkbox" data-mf="blockedCookies" /> Blocked response cookies</label>
+            <label><input type="checkbox" data-mf="blockedReq" /> Blocked requests</label>
+            <label><input type="checkbox" data-mf="thirdParty" /> 3rd-party requests</label>
+          </div>
+        </div>
+        <span class="sep"></span>
+        <div id="typeFilters" class="type-filters"></div>
+      </div>
+      <div class="tb-row keys" id="keysRow">
+        <label>Key <input id="keyInput" type="text" spellcheck="false" placeholder="enter AES key" /></label>
+        <label>IV <input id="ivInput" type="text" spellcheck="false" placeholder="optional — defaults to key" /></label>
+        <button id="saveKey">Save</button>
+        <button id="resetKey" class="ghost">Clear</button>
+        <span id="keyStatus" class="muted"></span>
+      </div>
+    </div>
+
+    <div id="main">
+      <div id="listPane">
+        <table id="reqTable">
+          <colgroup id="reqCols"></colgroup>
+          <thead>
+            <tr id="reqHead"></tr>
+          </thead>
+          <tbody id="reqBody"></tbody>
+        </table>
+        <div id="empty" class="empty">
+          Recording network activity… trigger an API call to see it here.
+        </div>
+      </div>
+
+      <div id="splitter" hidden title="Drag to resize · double-click to reset"></div>
+
+      <div id="detailPane" hidden>
+        <div id="detailTabs">
+          <button class="dtab active" data-tab="headers">Headers</button>
+          <button class="dtab" data-tab="payload">Payload</button>
+          <button class="dtab" data-tab="preview">Preview</button>
+          <button class="dtab" data-tab="response">Response</button>
+          <button class="dtab" data-tab="timing">Timing</button>
+          <button class="dtab" data-tab="cookies">Cookies</button>
+          <button class="dtab" data-tab="initiator">Initiator</button>
+          <span class="dtab-spacer"></span>
+          <button id="closeDetail" class="close" title="Close">✕</button>
+        </div>
+        <div id="detailContent"></div>
+      </div>
+    </div>
+
+    <script src="crypto.js"></script>
+    <script src="panel.js"></script>
+  </body>
+</html>

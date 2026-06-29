@@ -1,0 +1,18 @@
+node_modules/
+dist/
+
+# Build artifacts (packed extension: CipherNet.crx/.zip, dist.crx, etc.)
+*.crx
+*.zip
+
+# Private signing key — NEVER commit or share. Whoever holds it can ship
+# updates Chrome accepts as this same extension. Back it up somewhere safe.
+key.pem
+*.pem
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
