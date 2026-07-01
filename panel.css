@@ -352,6 +352,13 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 #toolbar #sendEncryptBtn:hover,
 #toolbar #sendDecryptBtn:hover { filter: brightness(1.12); }
 
+/* Decrypt drawer action buttons — decrypt = purple, clear = gray (matches the
+   Encrypt drawer scheme). */
+#toolbar #decryptBtn   { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+#toolbar #decryptClear { background: #6b7280; border-color: #6b7280; color: #fff; }
+#toolbar #decryptBtn:hover,
+#toolbar #decryptClear:hover { filter: brightness(1.12); }
+
 /* Postman-style response viewer */
 .enc-response { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 .enc-response[hidden] { display: none; }
@@ -359,8 +366,50 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .resp-status { font-weight: 600; }
 .resp-status.ok { color: var(--ok); }
 .resp-status.bad { color: var(--err); }
-.resp-dim { color: var(--muted); }
+.resp-dim { color: var(--muted); word-break: break-all; }
 .resp-bar { display: flex; gap: 6px; }
+
+/* response tabs (Body / Cookies / Headers / History) */
+.resp-tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+#encResponse .rtab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+#encResponse .rtab:hover { background: transparent; color: var(--fg); }
+#encResponse .rtab.active { color: var(--fg); border-bottom-color: var(--accent); }
+.resp-tabcontent { padding-top: 4px; }
+
+/* response History tab */
+.resp-history { display: flex; flex-direction: column; gap: 2px; }
+#encResponse .rhist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: var(--fg);
+  font-family: Consolas, monospace;
+}
+#encResponse .rhist-row:hover { background: var(--bg2); }
+#encResponse .rhist-row.active { background: var(--sel); color: var(--sel-fg); }
+.rhist-method { color: var(--post); font-weight: 600; flex: 0 0 auto; min-width: 42px; }
+.rhist-status { flex: 0 0 auto; }
+.rhist-status.ok { color: var(--ok); }
+.rhist-status.bad { color: var(--err); }
+.rhist-row.active .rhist-method, .rhist-row.active .rhist-status { color: inherit; }
+.rhist-url { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rhist-time { color: var(--muted); flex: 0 0 auto; }
+.rhist-row.active .rhist-time { color: inherit; }
 .chk { display: flex; align-items: center; gap: 4px; color: var(--muted); }
 .count { color: var(--muted); margin-left: auto; }
 .muted { color: var(--muted); }

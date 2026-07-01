@@ -96,18 +96,36 @@ to .NET's default — so round-trips match byte-for-byte.
   - **Bearer Token** — a field beside Payload/Body for an `Authorization` token.
     It is **never encrypted**; it's sent as-is (with `Bearer ` prepended if you
     omit it) on the Send requests below.
-  - **Send Encrypt** / **Send Decrypt** — fire the request like Postman and show
-    the response (status · time · size, then the body with a raw/decrypted
-    toggle and Copy). **Send Encrypt** encrypts the query string and body first,
-    then sends; **Send Decrypt** sends the URL/body exactly as entered and shows
-    the (decrypted, when possible) response. The method is `GET` when there's no
-    body, `POST` (JSON) when there is.
+  - **Send Encrypt** / **Send Decrypt** — fire the request like Postman. **Send
+    Encrypt** encrypts the query string and body first, then sends; **Send
+    Decrypt** sends the URL/body exactly as entered. The method is `GET` when
+    there's no body, `POST` (JSON) when there is.
+  - **Response viewer** — a Postman-style panel: a status · time · size · method
+    URL line, then tabs:
+    - **Body** — the response body via `bodyView` (decrypted when possible, with
+      a raw/decrypted toggle and Copy).
+    - **Headers** — the readable response headers (cross-origin responses only
+      expose CORS-safelisted ones).
+    - **Cookies** — any `Set-Cookie` the browser exposes (usually none — fetch
+      hides Set-Cookie).
+    - **History** — every request sent this session; click a row to reload its
+      response. (In-memory only.)
 - **Decrypt 🔓** — the quick reverse of Encrypt URL: paste any CipherNet-encrypted
   (Base64) value and click **Decrypt** (or **Ctrl/Cmd+Enter**) to get the
   plaintext, pretty-printed when it's JSON, with a **View raw / View decrypted**
   toggle and a **Copy** button. It uses the saved key/IV and tries a few
-  encodings (trimmed, unquoted, percent-decoded), falling back to a best-effort
-  no-padding decrypt so odd-padded values still come out as text.
+  encodings (trimmed, unquoted, percent-decoded).
+  - **Paste a whole URL** — if the input is a URL whose query string is encrypted
+    (`https://host/path?<ciphertext>`), the tool decrypts just the query and
+    shows the **full decrypted URL** (with Copy), plus the decrypted query body.
+  - **Auto-lenient** — a real AES-CBC ciphertext is always a multiple of 16
+    bytes, and Web Crypto rejects anything else outright (unlike CryptoJS-based
+    tools, which silently tolerate it). When a strict decrypt fails, the tool
+    **automatically** retries in lenient mode: it trims the tail to whole 16-byte
+    blocks and decrypts **without PKCS7 validation** — matching CryptoJS — so a
+    value with a stray/truncated tail still decrypts (a note reports how many
+    tail bytes were dropped; the very end may be garbled). The same auto-lenient
+    fallback applies to the Encrypt URL response body.
 - **Filter** — a Chrome-style filter mini-language (everything else is a plain
   URL substring; prefix a term with `-` to negate):
 

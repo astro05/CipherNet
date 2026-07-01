@@ -99,20 +99,21 @@ export const CipherNetCrypto = (() => {
     return bytes.subarray(0, end);
   }
 
-  // AES-CBC decrypt WITHOUT Web Crypto's strict PKCS7 check. Web Crypto always
-  // validates+strips PKCS7 and throws (empty-message OperationError) when the
-  // padding isn't valid — so a response that's zero-padded or oddly padded can't
-  // be read. Trick: append a crafted block E(0x10¹⁶ ⊕ Cₙ); Web Crypto then strips
-  // that synthetic full-padding block instead of the real last block, and we do
-  // our own padding removal. Best-effort — a wrong key still yields garbage.
-  async function decryptNoPad(base64Cipher, keyStr, ivStr) {
-    const encKey = await importKey(keyStr, ["encrypt"]);
-    const decKey = await importKey(keyStr, ["decrypt"]);
-    const iv = strToBytes(ivStr || keyStr);
-    const cipher = base64ToBytes(base64Cipher);
+  // AES-CBC decrypt of raw cipher BYTES WITHOUT Web Crypto's strict PKCS7 check.
+  // Web Crypto always validates+strips PKCS7 and throws (empty-message
+  // OperationError) when the padding isn't valid — so a response that's
+  // zero-padded or oddly padded can't be read. Trick: append a crafted block
+  // E(0x10¹⁶ ⊕ Cₙ); Web Crypto then strips that synthetic full-padding block
+  // instead of the real last block, and we do our own padding removal.
+  // `cipher` must be whole 16-byte blocks. Best-effort — a wrong key still yields
+  // garbage.
+  async function decryptNoPadBytes(cipher, keyStr, ivStr) {
     if (cipher.length === 0 || cipher.length % 16 !== 0) {
       throw new Error("ciphertext length is not a multiple of 16");
     }
+    const encKey = await importKey(keyStr, ["encrypt"]);
+    const decKey = await importKey(keyStr, ["decrypt"]);
+    const iv = strToBytes(ivStr || keyStr);
     const lastBlock = cipher.subarray(cipher.length - 16);
     const b = new Uint8Array(16);
     for (let i = 0; i < 16; i++) b[i] = 0x10 ^ lastBlock[i]; // 0x10 = full-padding byte
@@ -123,6 +124,35 @@ export const CipherNetCrypto = (() => {
     combined.set(cExtra, cipher.length);
     const plainBuf = await crypto.subtle.decrypt({ name: "AES-CBC", iv }, decKey, combined);
     return dec.decode(stripPadding(new Uint8Array(plainBuf)));
+  }
+
+  // Base64 ciphertext -> plaintext without PKCS7 validation (see above).
+  async function decryptNoPad(base64Cipher, keyStr, ivStr) {
+    return decryptNoPadBytes(base64ToBytes(base64Cipher), keyStr, ivStr);
+  }
+
+  // Lenient decrypt (CryptoJS-compatible): tolerate a ciphertext whose length
+  // isn't a multiple of 16 by trimming the ragged tail down to whole 16-byte
+  // blocks, then decrypting WITHOUT PKCS7 validation. This mirrors how CryptoJS
+  // silently handles non-block-aligned input (which strict Web Crypto rejects
+  // outright). Best-effort: a wrong key or a truly-corrupt blob still yields
+  // garbage, and the last kept block may be real plaintext rather than padding,
+  // so the tail can be slightly off. `dropped` = trailing bytes discarded.
+  async function decryptLenient(candidates, keyStr, ivStr) {
+    const list = (Array.isArray(candidates) ? candidates : [candidates]).filter(Boolean);
+    let lastErr = null;
+    for (const c of list) {
+      try {
+        const bytes = base64ToBytes(c);
+        const aligned = bytes.length - (bytes.length % 16);
+        if (aligned < 16) throw new Error("fewer than one full 16-byte block");
+        const text = await decryptNoPadBytes(bytes.subarray(0, aligned), keyStr, ivStr);
+        return { ok: true, text, forced: true, dropped: bytes.length - aligned };
+      } catch (e) {
+        lastErr = (e && e.message) || lastErr;
+      }
+    }
+    return { ok: false, error: lastErr || "decryption failed" };
   }
 
   // Strict decrypt first; if every candidate fails, fall back to the best-effort
@@ -143,5 +173,16 @@ export const CipherNetCrypto = (() => {
     return { ok: false, error: lastErr || "decryption failed" };
   }
 
-  return { decrypt, encrypt, tryDecrypt, tryDecryptLoose, decryptNoPad, base64ToBytes, bytesToBase64 };
+  // Strict/loose decrypt, then AUTO-fall back to the lenient (ragged-tolerant)
+  // path when that fails — so a non-block-aligned value still decrypts without
+  // the caller having to opt in. Marks `lenient: true` when the fallback ran;
+  // on total failure returns the (more informative) loose error.
+  async function tryDecryptAuto(candidates, keyStr, ivStr) {
+    const res = await tryDecryptLoose(candidates, keyStr, ivStr);
+    if (res.ok) return res;
+    const l = await decryptLenient(candidates, keyStr, ivStr);
+    return l.ok ? { ...l, lenient: true } : res;
+  }
+
+  return { decrypt, encrypt, tryDecrypt, tryDecryptLoose, decryptLenient, tryDecryptAuto, decryptNoPad, base64ToBytes, bytesToBase64 };
 })();

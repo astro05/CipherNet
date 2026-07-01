@@ -242,46 +242,127 @@ async function sendRequest(mode) {
   try {
     const resp = await fetch(url, { method, headers, body: method === "POST" ? body : undefined });
     const text = await resp.text();
-    await renderSendResponse({
+    // Decrypt the response body up front (auto-lenient on failure) so switching
+    // response tabs / history is instant.
+    const candidates = [text, text.trim(), stripQuotes(text), safeDecode(text)];
+    const decRes = text ? await CipherNetCrypto.tryDecryptAuto(candidates, state.key, state.iv) : null;
+    const entry = {
+      method, url,
       status: resp.status,
       statusText: resp.statusText,
       timeMs: Math.round(performance.now() - started),
       size: new Blob([text]).size,
       body: text,
-    });
+      headers: [...resp.headers.entries()].map(([name, value]) => ({ name, value })),
+      decRes,
+      at: new Date(),
+    };
+    sendHistory.push(entry);
+    respTab = "body";
+    renderResponseView(entry);
     flashEnc("");
   } catch (e) {
     flashEnc("Request failed: " + (e.message || e), true);
   }
 }
 
-// Postman-style response: a status/time/size meta line + the body. The body reuses
-// bodyView (same as the Response detail tab): it shows the decrypted text when the
-// body decrypts, and the raw bytes + the reason when it can't — so "View decrypted"
-// always gives feedback instead of silently doing nothing on an error response.
-async function renderSendResponse(r) {
+/* --------------------- Postman-style response viewer --------------------- */
+// Past sends this session (for the History tab). In-memory only.
+const sendHistory = [];
+let respTab = "body";
+
+// Status/time/size meta line + Body / Cookies / Headers / History tabs. `entry`
+// is the response being shown (may be an older one picked from History).
+function renderResponseView(entry) {
   els.encResponse.innerHTML = "";
   els.encResponse.hidden = false;
 
-  const ok = r.status >= 200 && r.status < 400;
+  const ok = entry.status >= 200 && entry.status < 400;
   const meta = el("div", "resp-meta");
   meta.appendChild(el("span", "resp-status " + (ok ? "ok" : "bad"),
-    `${r.status} ${r.statusText || reasonPhrase(r.status)}`.trim()));
-  meta.appendChild(el("span", "resp-dim", fmtTime(r.timeMs)));
-  meta.appendChild(el("span", "resp-dim", fmtSize(r.size)));
+    `${entry.status} ${entry.statusText || reasonPhrase(entry.status)}`.trim()));
+  meta.appendChild(el("span", "resp-dim", fmtTime(entry.timeMs)));
+  meta.appendChild(el("span", "resp-dim", fmtSize(entry.size)));
+  meta.appendChild(el("span", "resp-dim", `${entry.method} ${entry.url}`));
   els.encResponse.appendChild(meta);
 
-  if (!r.body) {
-    els.encResponse.appendChild(el("div", "muted-block", "No response body."));
-    return;
+  const tabs = el("div", "resp-tabs");
+  const content = el("div", "resp-tabcontent");
+  const defs = [
+    ["body", "Body"],
+    ["cookies", "Cookies"],
+    ["headers", `Headers (${entry.headers.length})`],
+    ["history", `History (${sendHistory.length})`],
+  ];
+  for (const [id, label] of defs) {
+    const b = el("button", "rtab" + (id === respTab ? " active" : ""), label);
+    b.addEventListener("click", () => { respTab = id; renderResponseView(entry); });
+    tabs.appendChild(b);
   }
-  // Try a few encodings so quoted / whitespace-wrapped ciphertext still decrypts.
-  // tryDecryptLoose also falls back to a best-effort no-pad decrypt, so an
-  // odd-padded API response (e.g. an error body) still comes out as text.
-  const candidates = [r.body, r.body.trim(), stripQuotes(r.body), safeDecode(r.body)];
-  const res = await CipherNetCrypto.tryDecryptLoose(candidates, state.key, state.iv);
-  if (res.forced) {
-    els.encResponse.appendChild(el("div", "muted-block", "Decrypted best-effort (response padding ignored)."));
+  els.encResponse.appendChild(tabs);
+  els.encResponse.appendChild(content);
+
+  if (respTab === "headers") content.appendChild(respHeaders(entry));
+  else if (respTab === "cookies") content.appendChild(respCookies(entry));
+  else if (respTab === "history") content.appendChild(respHistory(entry));
+  else content.appendChild(respBody(entry));
+}
+
+// Body tab: reuses bodyView (decrypted text when it decrypts, raw + reason when
+// not), with a note when the decrypt was lenient / best-effort.
+function respBody(entry) {
+  if (!entry.body) return el("div", "muted-block", "No response body.");
+  const wrap = el("div");
+  const res = entry.decRes;
+  if (res && res.ok && res.lenient) {
+    wrap.appendChild(el("div", "muted-block", `Lenient decrypt: dropped ${res.dropped} ragged tail byte(s).`));
+  } else if (res && res.ok && res.forced) {
+    wrap.appendChild(el("div", "muted-block", "Decrypted best-effort (response padding ignored)."));
   }
-  els.encResponse.appendChild(bodyView(res.ok ? res.text : null, r.body, res));
+  wrap.appendChild(bodyView(res && res.ok ? res.text : null, entry.body, res));
+  return wrap;
+}
+
+function respHeaders(entry) {
+  if (!entry.headers.length) {
+    return el("div", "muted-block", "No readable response headers. (Cross-origin responses expose only CORS-safelisted headers.)");
+  }
+  const grid = el("div", "kv");
+  for (const h of entry.headers) {
+    grid.appendChild(el("div", "k", h.name));
+    grid.appendChild(el("div", "v", h.value));
+  }
+  return grid;
+}
+
+function respCookies(entry) {
+  const setCookies = entry.headers.filter((h) => /^set-cookie$/i.test(h.name));
+  if (!setCookies.length) {
+    return el("div", "muted-block", "No response cookies. (Browsers hide Set-Cookie from fetch, so server-set cookies aren't visible here.)");
+  }
+  const grid = el("div", "kv");
+  for (const h of setCookies) {
+    const pair = h.value.split(";")[0];
+    const i = pair.indexOf("=");
+    grid.appendChild(el("div", "k", i < 0 ? pair : pair.slice(0, i)));
+    grid.appendChild(el("div", "v", i < 0 ? "" : pair.slice(i + 1)));
+  }
+  return grid;
+}
+
+function respHistory(current) {
+  if (!sendHistory.length) return el("div", "muted-block", "No requests sent yet.");
+  const list = el("div", "resp-history");
+  for (let i = sendHistory.length - 1; i >= 0; i--) {
+    const h = sendHistory[i];
+    const ok = h.status >= 200 && h.status < 400;
+    const row = el("button", "rhist-row" + (h === current ? " active" : ""));
+    row.appendChild(el("span", "rhist-method", h.method));
+    row.appendChild(el("span", "rhist-status " + (ok ? "ok" : "bad"), String(h.status)));
+    row.appendChild(el("span", "rhist-url", h.url));
+    row.appendChild(el("span", "rhist-time", fmtTime(h.timeMs)));
+    row.addEventListener("click", () => { respTab = "body"; renderResponseView(h); });
+    list.appendChild(row);
+  }
+  return list;
 }
