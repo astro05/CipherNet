@@ -1,3 +1,5 @@
+**Version:** 2.11.1 | **Last Modified:** 2026-07-01
+
 # Features
 
 ## Appearance
