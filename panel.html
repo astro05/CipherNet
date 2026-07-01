@@ -69,9 +69,12 @@
         <div class="enc-inputs">
           <label class="enc-field"><span>URL</span><input id="encUrl" type="text" spellcheck="false" placeholder="https://api.company.com/path?foo=bar&amp;baz=1" /></label>
           <label class="enc-field"><span>Payload / Body</span><textarea id="encBody" spellcheck="false" rows="2" placeholder='{"userId":42}'></textarea></label>
+          <label class="enc-field"><span>Bearer Token — not encrypted</span><textarea id="encToken" spellcheck="false" rows="2" placeholder="paste token — with or without &quot;Bearer &quot;"></textarea></label>
           <div class="enc-actions">
             <button id="encryptBtn">Encrypt</button>
             <button id="encryptClear" class="ghost">Clear</button>
+            <button id="sendEncryptBtn" title="Encrypt the query/body, then send the request">Send Encrypt</button>
+            <button id="sendDecryptBtn" title="Send the request as-is (no encryption)">Send Decrypt</button>
             <span id="encStatus" class="muted"></span>
           </div>
         </div>
@@ -89,6 +92,7 @@
           </div>
         </div>
         <div id="encOutput" class="enc-output" hidden></div>
+        <div id="encResponse" class="enc-response" hidden></div>
       </div>
     </div>
 

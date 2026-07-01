@@ -103,6 +103,10 @@ const els = {
   encOutput: document.getElementById("encOutput"),
   encParams: document.getElementById("encParams"),
   encParamsBody: document.getElementById("encParamsBody"),
+  encToken: document.getElementById("encToken"),
+  sendEncryptBtn: document.getElementById("sendEncryptBtn"),
+  sendDecryptBtn: document.getElementById("sendDecryptBtn"),
+  encResponse: document.getElementById("encResponse"),
   detailPane: document.getElementById("detailPane"),
   detailTabs: document.getElementById("detailTabs"),
   detailContent: document.getElementById("detailContent"),
@@ -223,6 +227,8 @@ els.encryptToggle.addEventListener("click", () => {
   if (open) renderParamsFromUrl();
 });
 els.encryptBtn.addEventListener("click", runEncrypt);
+els.sendEncryptBtn.addEventListener("click", () => sendRequest("encrypt"));
+els.sendDecryptBtn.addEventListener("click", () => sendRequest("decrypt"));
 els.encUrl.addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); runEncrypt(); }
 });
@@ -231,8 +237,11 @@ els.encUrl.addEventListener("input", renderParamsFromUrl);
 els.encryptClear.addEventListener("click", () => {
   els.encUrl.value = "";
   els.encBody.value = "";
+  els.encToken.value = "";
   els.encOutput.hidden = true;
   els.encOutput.innerHTML = "";
+  els.encResponse.hidden = true;
+  els.encResponse.innerHTML = "";
   renderParamsFromUrl(); // clears + hides the params table
   flashEnc("");
 });
@@ -378,6 +387,113 @@ async function runEncrypt() {
   } catch (e) {
     flashEnc(e.message || "Encryption failed.", true);
   }
+}
+
+/* ------- Send Encrypt / Send Decrypt: fire the request like Postman ------- */
+// Common reason phrases (the browser leaves statusText empty on HTTP/2).
+function reasonPhrase(code) {
+  const M = {
+    200: "OK", 201: "Created", 202: "Accepted", 204: "No Content",
+    301: "Moved Permanently", 302: "Found", 304: "Not Modified",
+    400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found",
+    405: "Method Not Allowed", 409: "Conflict", 415: "Unsupported Media Type",
+    422: "Unprocessable Entity", 429: "Too Many Requests",
+    500: "Internal Server Error", 502: "Bad Gateway", 503: "Service Unavailable",
+    504: "Gateway Timeout",
+  };
+  return M[code] || "";
+}
+
+// mode "encrypt": encrypt the query string + body first, then send.
+// mode "decrypt": send the URL/body exactly as entered (no encryption).
+// The Bearer Token is always sent as-is in the Authorization header.
+async function sendRequest(mode) {
+  const rawUrl = els.encUrl.value.trim();
+  const rawBody = els.encBody.value;
+  const token = els.encToken.value.trim();
+  els.encResponse.hidden = true;
+  els.encResponse.innerHTML = "";
+
+  if (!rawUrl) { flashEnc("Enter a URL to send.", true); return; }
+
+  const { base, query } = splitUrlForEncrypt(rawUrl);
+  const willEncryptQuery = base != null && query.trim() !== "";
+  const willEncryptBody = rawBody.trim() !== "";
+  if (mode === "encrypt" && (willEncryptQuery || willEncryptBody) && !state.key) {
+    flashEnc("Set the AES key in 🔑 Key first.", true);
+    return;
+  }
+
+  let url = rawUrl;
+  let body = rawBody;
+  try {
+    if (mode === "encrypt") {
+      if (willEncryptQuery) url = base + "?" + (await CipherNetCrypto.encrypt(query, state.key, state.iv));
+      if (willEncryptBody) body = await CipherNetCrypto.encrypt(rawBody, state.key, state.iv);
+    }
+  } catch (e) {
+    flashEnc(e.message || "Encryption failed.", true);
+    return;
+  }
+
+  const method = body.trim() !== "" ? "POST" : "GET";
+  const headers = {};
+  if (token) headers["Authorization"] = /^bearer\s/i.test(token) ? token : "Bearer " + token;
+  if (method === "POST") headers["Content-Type"] = "application/json";
+
+  flashEnc("Sending…");
+  const started = performance.now();
+  try {
+    const resp = await fetch(url, { method, headers, body: method === "POST" ? body : undefined });
+    const text = await resp.text();
+    await renderSendResponse({
+      status: resp.status,
+      statusText: resp.statusText,
+      timeMs: Math.round(performance.now() - started),
+      size: new Blob([text]).size,
+      body: text,
+    });
+    flashEnc("");
+  } catch (e) {
+    flashEnc("Request failed: " + (e.message || e), true);
+  }
+}
+
+// Postman-style response: a status/time/size meta line + the body. The body reuses
+// bodyView (same as the Response detail tab): it shows the decrypted text when the
+// body decrypts, and the raw bytes + the reason when it can't — so "View decrypted"
+// always gives feedback instead of silently doing nothing on an error response.
+async function renderSendResponse(r) {
+  els.encResponse.innerHTML = "";
+  els.encResponse.hidden = false;
+
+  const ok = r.status >= 200 && r.status < 400;
+  const meta = el("div", "resp-meta");
+  meta.appendChild(el("span", "resp-status " + (ok ? "ok" : "bad"),
+    `${r.status} ${r.statusText || reasonPhrase(r.status)}`.trim()));
+  meta.appendChild(el("span", "resp-dim", fmtTime(r.timeMs)));
+  meta.appendChild(el("span", "resp-dim", fmtSize(r.size)));
+  els.encResponse.appendChild(meta);
+
+  if (!r.body) {
+    els.encResponse.appendChild(el("div", "muted-block", "No response body."));
+    return;
+  }
+  // Try a few encodings so quoted / whitespace-wrapped ciphertext still decrypts.
+  // tryDecryptLoose also falls back to a best-effort no-pad decrypt, so an
+  // odd-padded API response (e.g. an error body) still comes out as text.
+  const candidates = [r.body, r.body.trim(), stripQuotes(r.body), safeDecode(r.body)];
+  const res = await CipherNetCrypto.tryDecryptLoose(candidates, state.key, state.iv);
+  if (res.forced) {
+    els.encResponse.appendChild(el("div", "muted-block", "Decrypted best-effort (response padding ignored)."));
+  }
+  els.encResponse.appendChild(bodyView(res.ok ? res.text : null, r.body, res));
+}
+// Drop a single pair of surrounding double-quotes (CipherNet sometimes returns the
+// ciphertext as a JSON string).
+function stripQuotes(s) {
+  const t = String(s).trim();
+  return t.length >= 2 && t[0] === '"' && t[t.length - 1] === '"' ? t.slice(1, -1) : t;
 }
 
 /* ------------------------------ toolbar ------------------------------- */
@@ -1584,6 +1700,17 @@ function kvList(pairs) {
   return grid;
 }
 
+// Pull the raw Bearer token out of the Authorization request header, if present.
+function bearerTokenOf(entry) {
+  const h = (entry.reqHeaders || []).find((x) => /^authorization$/i.test(x.name));
+  if (!h || !h.value) return null;
+  const m = /^Bearer\s+(.+)$/i.exec(h.value.trim());
+  return m ? m[1].trim() : null;
+}
+function maskToken(t) {
+  return t.length <= 20 ? t : t.slice(0, 12) + "…" + t.slice(-6);
+}
+
 async function renderHeaders(entry, seq) {
   // General
   const gen = section("General");
@@ -1599,6 +1726,16 @@ async function renderHeaders(entry, seq) {
   grid.appendChild(el("div", "v", `${entry.status} ${entry.statusText}`.trim()));
   grid.appendChild(el("div", "k", "Remote Address"));
   grid.appendChild(el("div", "v", entry.serverIP || "—"));
+
+  // Copy the Authorization Bearer token (masked here; the button copies it whole).
+  const bearer = bearerTokenOf(entry);
+  if (bearer) {
+    grid.appendChild(el("div", "k", "Bearer Token"));
+    const bv = el("div", "v has-copy");
+    bv.appendChild(el("span", "url-text", maskToken(bearer)));
+    bv.appendChild(copyBtn(() => bearer));
+    grid.appendChild(bv);
+  }
   gen.s.appendChild(grid);
   els.detailContent.appendChild(gen.s);
 

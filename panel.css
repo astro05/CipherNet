@@ -319,6 +319,17 @@ body.encrypting #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   line-height: 1;
 }
 .ep-remove:hover { color: var(--err); }
+
+/* Send Encrypt / Send Decrypt + Postman-style response viewer */
+#sendEncryptBtn, #sendDecryptBtn { border-color: var(--accent); color: var(--accent); }
+.enc-response { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.enc-response[hidden] { display: none; }
+.resp-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-family: Consolas, monospace; }
+.resp-status { font-weight: 600; }
+.resp-status.ok { color: var(--ok); }
+.resp-status.bad { color: var(--err); }
+.resp-dim { color: var(--muted); }
+.resp-bar { display: flex; gap: 6px; }
 .chk { display: flex; align-items: center; gap: 4px; color: var(--muted); }
 .count { color: var(--muted); margin-left: auto; }
 .muted { color: var(--muted); }

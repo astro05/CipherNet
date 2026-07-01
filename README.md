@@ -52,7 +52,10 @@ to .NET's default — so round-trips match byte-for-byte.
   Network panel:
   - **Headers** — General (URL, method, status, remote address) + Response
     Headers + Request Headers. When the query string decrypts, a **Request URL
-    (decrypted)** row is added.
+    (decrypted)** row is added. When the request carries an `Authorization:
+    Bearer …` header, a **Bearer Token** row appears (masked) with a **Copy**
+    button that copies the full token — handy for pasting into the Encrypt URL
+    tool below.
   - **Payload** — decrypted **Query String Parameters** (parsed into a table)
     and decrypted **Request Payload**, each with a **View raw / View decrypted**
     toggle and **Copy**.
@@ -80,6 +83,15 @@ to .NET's default — so round-trips match byte-for-byte.
   encrypting. Opening the tool hides the request list / detail view and the
   resource-type filter row so you get a focused encrypt view; click **🔒 Encrypt
   URL** again to close the tool and bring the network view back.
+  - **Bearer Token** — a field beside Payload/Body for an `Authorization` token.
+    It is **never encrypted**; it's sent as-is (with `Bearer ` prepended if you
+    omit it) on the Send requests below.
+  - **Send Encrypt** / **Send Decrypt** — fire the request like Postman and show
+    the response (status · time · size, then the body with a raw/decrypted
+    toggle and Copy). **Send Encrypt** encrypts the query string and body first,
+    then sends; **Send Decrypt** sends the URL/body exactly as entered and shows
+    the (decrypted, when possible) response. The method is `GET` when there's no
+    body, `POST` (JSON) when there is.
 - **Filter** — a Chrome-style filter mini-language (everything else is a plain
   URL substring; prefix a term with `-` to negate):
 

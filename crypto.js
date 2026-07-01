@@ -84,5 +84,64 @@ const CipherNetCrypto = (() => {
     return { ok: false, error: lastErr ? lastErr.message : "no input" };
   }
 
-  return { decrypt, encrypt, tryDecrypt, base64ToBytes, bytesToBase64 };
+  // Strip PKCS7 padding when it's valid, else trailing zero bytes, else leave the
+  // bytes untouched. Used by the best-effort (no-pad) decrypt path.
+  function stripPadding(bytes) {
+    if (!bytes.length) return bytes;
+    const n = bytes[bytes.length - 1];
+    if (n >= 1 && n <= 16 && n <= bytes.length) {
+      let ok = true;
+      for (let i = bytes.length - n; i < bytes.length; i++) if (bytes[i] !== n) { ok = false; break; }
+      if (ok) return bytes.subarray(0, bytes.length - n);
+    }
+    let end = bytes.length;
+    while (end > 0 && bytes[end - 1] === 0) end--;
+    return bytes.subarray(0, end);
+  }
+
+  // AES-CBC decrypt WITHOUT Web Crypto's strict PKCS7 check. Web Crypto always
+  // validates+strips PKCS7 and throws (empty-message OperationError) when the
+  // padding isn't valid — so a response that's zero-padded or oddly padded can't
+  // be read. Trick: append a crafted block E(0x10¹⁶ ⊕ Cₙ); Web Crypto then strips
+  // that synthetic full-padding block instead of the real last block, and we do
+  // our own padding removal. Best-effort — a wrong key still yields garbage.
+  async function decryptNoPad(base64Cipher, keyStr, ivStr) {
+    const encKey = await importKey(keyStr, ["encrypt"]);
+    const decKey = await importKey(keyStr, ["decrypt"]);
+    const iv = strToBytes(ivStr || keyStr);
+    const cipher = base64ToBytes(base64Cipher);
+    if (cipher.length === 0 || cipher.length % 16 !== 0) {
+      throw new Error("ciphertext length is not a multiple of 16");
+    }
+    const lastBlock = cipher.subarray(cipher.length - 16);
+    const b = new Uint8Array(16);
+    for (let i = 0; i < 16; i++) b[i] = 0x10 ^ lastBlock[i]; // 0x10 = full-padding byte
+    const eBuf = await crypto.subtle.encrypt({ name: "AES-CBC", iv: new Uint8Array(16) }, encKey, b);
+    const cExtra = new Uint8Array(eBuf).subarray(0, 16);      // E(b); drop WebCrypto's own pad block
+    const combined = new Uint8Array(cipher.length + 16);
+    combined.set(cipher, 0);
+    combined.set(cExtra, cipher.length);
+    const plainBuf = await crypto.subtle.decrypt({ name: "AES-CBC", iv }, decKey, combined);
+    return dec.decode(stripPadding(new Uint8Array(plainBuf)));
+  }
+
+  // Strict decrypt first; if every candidate fails, fall back to the best-effort
+  // no-pad decrypt so an odd-padded API response still yields text. `forced`
+  // marks the fallback so callers can flag it.
+  async function tryDecryptLoose(candidates, keyStr, ivStr) {
+    const strict = await tryDecrypt(candidates, keyStr, ivStr);
+    if (strict.ok) return strict;
+    const list = (Array.isArray(candidates) ? candidates : [candidates]).filter(Boolean);
+    let lastErr = strict.error;
+    for (const c of list) {
+      try {
+        return { ok: true, text: await decryptNoPad(c, keyStr, ivStr), forced: true };
+      } catch (e) {
+        lastErr = (e && e.message) || lastErr;
+      }
+    }
+    return { ok: false, error: lastErr || "decryption failed" };
+  }
+
+  return { decrypt, encrypt, tryDecrypt, tryDecryptLoose, decryptNoPad, base64ToBytes, bytesToBase64 };
 })();
