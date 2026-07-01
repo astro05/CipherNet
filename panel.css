@@ -90,6 +90,9 @@ body { display: flex; flex-direction: column; }
   padding: 5px 8px;
 }
 .tb-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* .tb-row sets display:flex, which beats the UA [hidden] rule, so hide rows
+   explicitly when a row is collapsed (e.g. filters row in Encrypt URL mode). */
+.tb-row[hidden] { display: none; }
 #logo { width: 16px; height: 16px; flex: 0 0 auto; image-rendering: -webkit-optimize-contrast; }
 .tb-row + .tb-row { margin-top: 5px; }
 .sep { width: 1px; height: 16px; background: var(--border); }
@@ -203,6 +206,8 @@ body { display: flex; flex-direction: column; }
 #toolbar button.ghost { background: transparent; }
 #toolbar button.record { color: var(--muted); font-size: 13px; line-height: 1; }
 #toolbar button.record.recording { color: var(--err); }
+/* toggled-on toolbar button (e.g. Encrypt URL while its tool is open) */
+#toolbar button.active { background: var(--sel); border-color: var(--accent); color: var(--sel-fg); }
 
 #toolbar select {
   background: var(--bg3);
@@ -223,12 +228,48 @@ body { display: flex; flex-direction: column; }
 #filter { width: 160px; }
 .keys label { display: flex; align-items: center; gap: 4px; }
 .keys input { width: 200px; font-family: Consolas, monospace; }
+
+/* Encrypt URL tool (drawer) */
+.encryptor { display: none; flex-direction: column; align-items: stretch; gap: 8px; }
+.encryptor.open { display: flex; }
+.enc-inputs { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+.enc-field { display: flex; flex-direction: column; gap: 2px; }
+.enc-field > span { color: var(--muted); font-size: 11px; }
+#encUrl { width: 360px; font-family: Consolas, monospace; }
+.enc-field textarea {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  width: 320px;
+  resize: vertical;
+  font-family: Consolas, monospace;
+}
+.enc-actions { display: flex; align-items: center; gap: 8px; align-self: flex-end; padding-bottom: 1px; }
+#encStatus.err { color: var(--err); }
+.enc-output { display: flex; flex-direction: column; gap: 6px; }
+.enc-output[hidden] { display: none; }
+.enc-out-row { display: flex; align-items: baseline; gap: 8px; }
+.enc-out-label { color: var(--muted); flex: 0 0 120px; }
+.enc-out-value {
+  flex: 1 1 auto;
+  font-family: Consolas, monospace;
+  word-break: break-all;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
 .chk { display: flex; align-items: center; gap: 4px; color: var(--muted); }
 .count { color: var(--muted); margin-left: auto; }
 .muted { color: var(--muted); }
 
 /* -------------------------------- main --------------------------------- */
 #main { flex: 1 1 auto; display: flex; min-height: 0; }
+/* The #main id rule sets display:flex, which beats the UA [hidden] rule, so
+   hide it explicitly when the Encrypt URL tool takes over the view. */
+#main[hidden] { display: none; }
 
 #listPane { flex: 1 1 auto; overflow: auto; min-width: 0; position: relative; }
 

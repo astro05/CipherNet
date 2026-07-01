@@ -92,6 +92,15 @@ const els = {
   saveKey: document.getElementById("saveKey"),
   resetKey: document.getElementById("resetKey"),
   keyStatus: document.getElementById("keyStatus"),
+  // encrypt-url tool
+  encryptToggle: document.getElementById("encryptToggle"),
+  encryptRow: document.getElementById("encryptRow"),
+  encUrl: document.getElementById("encUrl"),
+  encBody: document.getElementById("encBody"),
+  encryptBtn: document.getElementById("encryptBtn"),
+  encryptClear: document.getElementById("encryptClear"),
+  encStatus: document.getElementById("encStatus"),
+  encOutput: document.getElementById("encOutput"),
   detailPane: document.getElementById("detailPane"),
   detailTabs: document.getElementById("detailTabs"),
   detailContent: document.getElementById("detailContent"),
@@ -122,6 +131,7 @@ const els = {
   throttle: document.getElementById("throttle"),
   throttleNote: document.getElementById("throttleNote"),
   // resource-type filters + "more filters"
+  filtersRow: document.getElementById("filtersRow"),
   typeFiltersBar: document.getElementById("typeFilters"),
   moreFiltersBtn: document.getElementById("moreFiltersBtn"),
   moreFiltersMenu: document.getElementById("moreFiltersMenu"),
@@ -193,6 +203,87 @@ function flashKey(msg) {
   setTimeout(() => (els.keyStatus.textContent = ""), 1500);
 }
 els.keysToggle.addEventListener("click", () => els.keysRow.classList.toggle("open"));
+
+/* --------------------------- encrypt-url tool -------------------------- */
+// Encrypt a plaintext URL/payload with the saved key the same way the CipherNet
+// backend does (AES-128-CBC -> Base64), so the output round-trips with the
+// decrypt path. The URL's query string is what gets encrypted; a bare value
+// (no "?") is encrypted whole.
+els.encryptToggle.addEventListener("click", () => {
+  const open = els.encryptRow.classList.toggle("open");
+  // Focus the encryptor: hide the network request list / detail view and the
+  // resource-type filter row while the Encrypt URL tool is open, and restore
+  // them when the tool is toggled off.
+  els.main.hidden = open;
+  els.filtersRow.hidden = open;
+  els.encryptToggle.classList.toggle("active", open);
+});
+els.encryptBtn.addEventListener("click", runEncrypt);
+els.encUrl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); runEncrypt(); }
+});
+els.encryptClear.addEventListener("click", () => {
+  els.encUrl.value = "";
+  els.encBody.value = "";
+  els.encOutput.hidden = true;
+  els.encOutput.innerHTML = "";
+  flashEnc("");
+});
+
+function flashEnc(msg, isErr) {
+  els.encStatus.textContent = msg;
+  els.encStatus.classList.toggle("err", !!isErr);
+}
+
+// Split a URL into base + query. With no "?", the whole value is encrypted.
+function splitUrlForEncrypt(url) {
+  const i = url.indexOf("?");
+  if (i === -1) return { base: null, query: url };
+  return { base: url.slice(0, i), query: url.slice(i + 1) };
+}
+
+// One output line: label + value + Copy button.
+function encOutRow(label, value) {
+  const row = el("div", "enc-out-row");
+  row.appendChild(el("div", "enc-out-label", label));
+  row.appendChild(el("div", "enc-out-value", value));
+  row.appendChild(copyBtn(() => value));
+  return row;
+}
+
+async function runEncrypt() {
+  const url = els.encUrl.value.trim();
+  const body = els.encBody.value;
+  els.encOutput.hidden = true;
+  els.encOutput.innerHTML = "";
+
+  if (!url && !body.trim()) { flashEnc("Enter a URL or payload to encrypt.", true); return; }
+  if (!state.key) { flashEnc("Set the AES key in 🔑 Key first.", true); return; }
+
+  flashEnc("Encrypting…");
+  try {
+    const out = el("div");
+    if (url) {
+      const { base, query } = splitUrlForEncrypt(url);
+      const cipher = await CipherNetCrypto.encrypt(query, state.key, state.iv);
+      if (base != null) {
+        out.appendChild(encOutRow("Encrypted URL", base + "?" + cipher));
+        out.appendChild(encOutRow("Encrypted query", cipher));
+      } else {
+        out.appendChild(encOutRow("Encrypted", cipher));
+      }
+    }
+    if (body.trim()) {
+      const cipher = await CipherNetCrypto.encrypt(body, state.key, state.iv);
+      out.appendChild(encOutRow("Encrypted body", cipher));
+    }
+    els.encOutput.appendChild(out);
+    els.encOutput.hidden = false;
+    flashEnc("Encrypted ✓");
+  } catch (e) {
+    flashEnc(e.message || "Encryption failed.", true);
+  }
+}
 
 /* ------------------------------ toolbar ------------------------------- */
 els.filter.addEventListener("input", () => {

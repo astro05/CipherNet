@@ -66,6 +66,15 @@ to .NET's default — so round-trips match byte-for-byte.
 - **Key 🔑** — starts empty: enter your AES key and **Save** (the **IV** is
   optional and defaults to the key). Persists via `chrome.storage` and
   re-renders the open request live. **Clear** wipes the stored key.
+- **Encrypt URL 🔒** — a small tool that does the reverse of decryption: paste a
+  plaintext **URL** and/or a **Payload / Body** and click **Encrypt** to get the
+  CipherNet-encrypted output (AES-128-CBC → Base64, using the saved key/IV). The URL's
+  **query string** is encrypted and spliced back in (`path?<ciphertext>`), so the
+  result round-trips with the decrypt path; a value with no `?` is encrypted
+  whole. Each output line has a **Copy** button. Handy for crafting or replaying
+  encrypted requests by hand. Opening the tool hides the request list / detail
+  view and the resource-type filter row so you get a focused encrypt view; click
+  **🔒 Encrypt URL** again to close the tool and bring the network view back.
 - **Filter** — a Chrome-style filter mini-language (everything else is a plain
   URL substring; prefix a term with `-` to negate):
 

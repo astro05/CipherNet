@@ -30,6 +30,7 @@
           </div>
         </div>
         <button id="keysToggle" class="ghost" title="Key settings">🔑 Key</button>
+        <button id="encryptToggle" class="ghost" title="Encrypt a URL / payload with the saved key">🔒 Encrypt URL</button>
         <span id="count" class="count">0 requests</span>
       </div>
       <div class="tb-row search" id="searchRow">
@@ -42,7 +43,7 @@
         <span id="searchStatus" class="muted"></span>
         <button id="searchClose" class="ghost" title="Close (Esc)">✕</button>
       </div>
-      <div class="tb-row filters-row">
+      <div class="tb-row filters-row" id="filtersRow">
         <div class="menu-wrap">
           <button id="moreFiltersBtn" class="ghost" title="More filters">More filters ▾</button>
           <div id="moreFiltersMenu" class="menu" hidden>
@@ -63,6 +64,18 @@
         <button id="saveKey">Save</button>
         <button id="resetKey" class="ghost">Clear</button>
         <span id="keyStatus" class="muted"></span>
+      </div>
+      <div class="tb-row encryptor" id="encryptRow">
+        <div class="enc-inputs">
+          <label class="enc-field"><span>URL</span><input id="encUrl" type="text" spellcheck="false" placeholder="https://api.company.com/path?foo=bar&amp;baz=1" /></label>
+          <label class="enc-field"><span>Payload / Body</span><textarea id="encBody" spellcheck="false" rows="2" placeholder='{"userId":42}'></textarea></label>
+          <div class="enc-actions">
+            <button id="encryptBtn">Encrypt</button>
+            <button id="encryptClear" class="ghost">Clear</button>
+            <span id="encStatus" class="muted"></span>
+          </div>
+        </div>
+        <div id="encOutput" class="enc-output" hidden></div>
       </div>
     </div>
 
