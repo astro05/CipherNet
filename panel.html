@@ -126,7 +126,7 @@
         <div class="enc-inputs">
           <label class="enc-field enc-field-wide">
             <span>Encrypted value</span>
-            <textarea id="decInput" spellcheck="false" rows="3" placeholder="paste the encrypted (Base64) value — decrypts with the saved key/IV"></textarea>
+            <textarea id="decInput" spellcheck="false" rows="3" placeholder="paste the encrypted value."></textarea>
           </label>
           <div class="enc-actions">
             <button id="decryptBtn" title="Decrypt (Ctrl/Cmd+Enter)">Decrypt</button>
@@ -140,13 +140,17 @@
 
     <div id="main">
       <div id="listPane">
-        <table id="reqTable">
-          <colgroup id="reqCols"></colgroup>
-          <thead>
-            <tr id="reqHead"></tr>
-          </thead>
-          <tbody id="reqBody"></tbody>
-        </table>
+        <div id="listInner">
+          <table id="reqTable">
+            <colgroup id="reqCols"></colgroup>
+            <thead>
+              <tr id="reqHead"></tr>
+            </thead>
+            <tbody id="reqBody"></tbody>
+          </table>
+          <!-- Full-height column resize handles overlaid on the table's borders. -->
+          <div id="colResizers"></div>
+        </div>
         <div id="empty" class="empty">
           Recording network activity… trigger an API call to see it here.
         </div>

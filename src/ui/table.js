@@ -96,12 +96,39 @@ export function renderHead() {
       th.classList.add("sorted");
       th.appendChild(el("span", "col-sort-arrow", state.sort.dir > 0 ? " ▲" : " ▼"));
     }
-    const grip = el("div", "col-grip");
-    grip.dataset.col = col.id;
-    th.appendChild(grip);
     els.reqHead.appendChild(th);
   }
   els.reqTable.style.width = total + "px";
+  renderColResizers();
+}
+
+// Full-height resize handles overlaid on each column's right border, so a column
+// can be resized by dragging the border at ANY vertical position (not just the
+// header). The overlay lives inside #listInner (which is sized to the table), so
+// the handles span the whole table height and scroll with it.
+function renderColResizers() {
+  const layer = els.colResizers;
+  if (!layer) return;
+  layer.innerHTML = "";
+  for (const col of visibleColumns()) {
+    const h = el("div", "col-resizer");
+    h.dataset.col = col.id;
+    h.title = "Drag to resize · double-click to auto-fit";
+    layer.appendChild(h);
+  }
+  positionColResizers();
+}
+// Place each handle at its column's cumulative right-edge x (called on resize too).
+function positionColResizers() {
+  const layer = els.colResizers;
+  if (!layer) return;
+  const handles = layer.children;
+  let x = 0, i = 0;
+  for (const col of visibleColumns()) {
+    x += state.columns.widths[col.id] || col.width;
+    if (handles[i]) handles[i].style.left = x + "px";
+    i++;
+  }
 }
 
 /* --- rows --- */
@@ -192,6 +219,7 @@ function setColWidth(id, w) {
   let total = 0;
   for (const c of visibleColumns()) total += state.columns.widths[c.id] || c.width;
   els.reqTable.style.width = total + "px";
+  positionColResizers();
 }
 function autoFitColumn(id) {
   const idx = visibleColumns().findIndex((c) => c.id === id);
@@ -206,22 +234,21 @@ function autoFitColumn(id) {
   setColWidth(id, Math.max(MIN_COL_WIDTH, Math.min(max + 6, 800)));
   persistColumns();
 }
-els.reqHead.addEventListener("mousedown", (e) => {
-  const grip = e.target.closest(".col-grip");
-  if (!grip) return;
+els.colResizers.addEventListener("mousedown", (e) => {
+  const h = e.target.closest(".col-resizer");
+  if (!h) return;
   e.preventDefault();
   e.stopPropagation();
   suppressColDrag = true; // don't let the header start a reorder drag
-  const id = grip.dataset.col;
+  const id = h.dataset.col;
   colResize = { id, startX: e.clientX, startW: state.columns.widths[id] || COLUMN_MAP[id].width };
   document.body.classList.add("col-resizing");
 });
-els.reqHead.addEventListener("dblclick", (e) => {
-  const grip = e.target.closest(".col-grip");
-  if (grip) autoFitColumn(grip.dataset.col);
+els.colResizers.addEventListener("dblclick", (e) => {
+  const h = e.target.closest(".col-resizer");
+  if (h) autoFitColumn(h.dataset.col);
 });
 els.reqHead.addEventListener("click", (e) => {
-  if (e.target.closest(".col-grip")) return; // resizing, not sorting
   const th = e.target.closest("th");
   if (th) toggleSort(th.dataset.col);
 });

@@ -139,10 +139,13 @@ function renderCollectionTree() {
   for (const folder of folders) {
     const fRow = el("div", "tree-folder");
     fRow.append(el("span", "tree-ic", "📁"), el("span", "tree-name", folder));
+    const fRen = el("button", "tree-rename", "✎");
+    fRen.title = "Rename folder";
+    fRen.addEventListener("click", (e) => { e.stopPropagation(); renameFolder(folder); });
     const fDel = el("button", "tree-del", "🗑");
     fDel.title = "Delete folder and its requests";
     fDel.addEventListener("click", (e) => { e.stopPropagation(); delFolder(folder); });
-    fRow.appendChild(fDel);
+    fRow.append(fRen, fDel);
     panel.appendChild(fRow);
 
     const apis = Object.keys(collections[folder]).sort();
@@ -150,14 +153,39 @@ function renderCollectionTree() {
     for (const name of apis) {
       const aRow = el("div", "tree-api" + (currentRef && currentRef.folder === folder && currentRef.name === name ? " active" : ""));
       aRow.append(el("span", "tree-ic", "•"), el("span", "tree-name", name));
+      const aRen = el("button", "tree-rename", "✎");
+      aRen.title = "Rename request";
+      aRen.addEventListener("click", (e) => { e.stopPropagation(); renameApi(folder, name); });
       const aDel = el("button", "tree-del", "🗑");
       aDel.title = "Delete request";
       aDel.addEventListener("click", (e) => { e.stopPropagation(); delApi(folder, name); });
-      aRow.appendChild(aDel);
+      aRow.append(aRen, aDel);
       aRow.addEventListener("click", () => loadApi(folder, name));
       panel.appendChild(aRow);
     }
   }
+}
+function renameFolder(folder) {
+  const next = (prompt("Rename folder:", folder) || "").trim();
+  if (!next || next === folder) return;
+  if (collections[next]) { flashEnc(`Folder “${next}” already exists.`, true); return; }
+  collections[next] = collections[folder];
+  delete collections[folder];
+  if (currentRef && currentRef.folder === folder) currentRef.folder = next;
+  setCollections(collections, () => flashEnc(`Renamed folder to “${next}”`));
+  renderCollectionTree();
+}
+function renameApi(folder, name) {
+  const f = collections[folder];
+  if (!f) return;
+  const next = (prompt("Rename request:", name) || "").trim();
+  if (!next || next === name) return;
+  if (f[next]) { flashEnc(`“${next}” already exists in this folder.`, true); return; }
+  f[next] = f[name];
+  delete f[name];
+  if (currentRef && currentRef.folder === folder && currentRef.name === name) currentRef.name = next;
+  setCollections(collections, () => flashEnc(`Renamed to “${next}”`));
+  renderCollectionTree();
 }
 function loadApi(folder, name) {
   const r = collections[folder] && collections[folder][name];

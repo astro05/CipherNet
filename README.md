@@ -44,8 +44,9 @@ to .NET's default — so round-trips match byte-for-byte.
 - A **request list** with `Name · Method · Status · Type · Size · Time` columns
   (plus optional `Initiator`, `Encryption`, `Decryption` columns). Encrypted
   requests are flagged with 🔒. Columns are **sortable** (click a header to cycle
-  ascending → descending → off, shown with ▲/▼), **resizable** (drag a header
-  border; double-click it to auto-fit), **reorderable** (drag a header), and
+  ascending → descending → off, shown with ▲/▼), **resizable** (drag a column
+  border at **any height**, not just the header; double-click it to auto-fit),
+  **reorderable** (drag a header), and
   **show/hide-able** (right-click a header). Sort, widths, order and visibility
   persist via `chrome.storage`; "Reset columns" restores defaults.
 - Click a request to open a detail pane with sub-tabs, just like Chrome's

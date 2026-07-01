@@ -78,6 +78,7 @@ export const els = {
   reqTable: document.getElementById("reqTable"),
   reqCols: document.getElementById("reqCols"),
   reqHead: document.getElementById("reqHead"),
+  colResizers: document.getElementById("colResizers"),
   // §27 network controls
   preserveLog: document.getElementById("preserveLog"),
   disableCache: document.getElementById("disableCache"),

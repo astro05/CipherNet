@@ -319,7 +319,8 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .tree-ic { flex: 0 0 auto; color: var(--muted); }
 .tree-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-empty { color: var(--muted); padding: 2px 4px 4px 20px; font-size: 11px; }
-.tree-del { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 0 4px; font-size: 12px; line-height: 1; }
+.tree-rename, .tree-del { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 0 4px; font-size: 12px; line-height: 1; }
+.tree-rename:hover { color: var(--accent); }
 .tree-del:hover { color: var(--err); }
 #encStatus.err { color: var(--err); }
 .enc-output { display: flex; flex-direction: column; gap: 6px; }
@@ -498,6 +499,27 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 #main[hidden] { display: none; }
 
 #listPane { flex: 1 1 auto; overflow: auto; min-width: 0; position: relative; }
+/* Wrapper sized to the table so the resize-handle overlay spans the full table
+   height and scrolls with it. */
+#listInner { position: relative; display: block; width: -moz-fit-content; width: fit-content; min-width: 100%; }
+#colResizers { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.col-resizer {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 10px;
+  margin-left: -5px;      /* center the grab strip on the column's right border */
+  cursor: col-resize;
+  pointer-events: auto;
+}
+.col-resizer::after {
+  content: "";
+  position: absolute;
+  left: 5px; top: 0; bottom: 0;
+  width: 1px;
+  background: transparent;
+}
+.col-resizer:hover::after,
+body.col-resizing .col-resizer:hover::after { background: var(--accent); width: 2px; }
 
 /* When a request is selected the list width is JS-controlled (see splitter);
    the divider is drawn by #splitter, not a border here. */
@@ -542,14 +564,6 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; -webkit-
 #reqTable thead th.dragging { opacity: 0.5; }
 #reqTable thead th.sorted { color: var(--fg); }
 .col-sort-arrow { color: var(--accent); font-size: 10px; }
-/* resize grip on the right edge of each header cell */
-.col-grip {
-  position: absolute;
-  top: 0; right: 0; bottom: 0;
-  width: 6px;
-  cursor: col-resize;
-}
-.col-grip:hover { background: var(--accent); }
 #reqTable td {
   padding: 3px 8px;
   border-bottom: 1px solid var(--row-border);
