@@ -89,6 +89,9 @@ body { display: flex; flex-direction: column; }
   border-bottom: 1px solid var(--border);
   padding: 5px 8px;
 }
+/* In Encrypt URL mode the network view is hidden, so let the toolbar (the whole
+   Encrypt URL panel) take the remaining height and scroll when it overflows. */
+body.encrypting #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .tb-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* .tb-row sets display:flex, which beats the UA [hidden] rule, so hide rows
    explicitly when a row is collapsed (e.g. filters row in Encrypt URL mode). */
@@ -261,6 +264,61 @@ body { display: flex; flex-direction: column; }
   border-radius: 4px;
   padding: 3px 6px;
 }
+
+/* Postman-style Query Params editor inside the Encrypt URL tool */
+.enc-params { display: flex; flex-direction: column; gap: 4px; }
+.enc-params[hidden] { display: none; }
+.enc-params-title { color: var(--muted); font-size: 11px; }
+.enc-params-grid {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  /* Header + up to 4 rows (3 params + the empty add-row) visible; adding a 4th
+     param pushes past this and the table scrolls. Rows are a fixed 30px. */
+  max-height: 152px;
+  overflow: auto;
+}
+.ep-row {
+  display: grid;
+  grid-template-columns: 26px 1fr 1fr 1fr 28px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  min-height: 30px;
+}
+#encParamsBody .ep-row:last-child { border-bottom: none; }
+/* keep the header row visible while the data rows scroll */
+.ep-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg2);
+  color: var(--muted);
+  font-weight: 600;
+}
+.ep-head > span { padding: 4px 8px; }
+.ep-head > span + span { border-left: 1px solid var(--border); }
+.ep-col-enable, .ep-col-act { display: flex; align-items: center; justify-content: center; }
+.ep-enable { margin: 0; cursor: pointer; }
+.ep-key, .ep-value, .ep-desc {
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--fg);
+  padding: 4px 8px;
+  width: 100%;
+  min-width: 0;
+  font-family: Consolas, monospace;
+}
+.ep-key:focus, .ep-value:focus, .ep-desc:focus { outline: none; background: var(--bg); }
+.ep-remove {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+.ep-remove:hover { color: var(--err); }
 .chk { display: flex; align-items: center; gap: 4px; color: var(--muted); }
 .count { color: var(--muted); margin-left: auto; }
 .muted { color: var(--muted); }

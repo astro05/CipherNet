@@ -70,11 +70,16 @@ to .NET's default — so round-trips match byte-for-byte.
   plaintext **URL** and/or a **Payload / Body** and click **Encrypt** to get the
   CipherNet-encrypted output (AES-128-CBC → Base64, using the saved key/IV). The URL's
   **query string** is encrypted and spliced back in (`path?<ciphertext>`), so the
-  result round-trips with the decrypt path; a value with no `?` is encrypted
-  whole. Each output line has a **Copy** button. Handy for crafting or replaying
-  encrypted requests by hand. Opening the tool hides the request list / detail
-  view and the resource-type filter row so you get a focused encrypt view; click
-  **🔒 Encrypt URL** again to close the tool and bring the network view back.
+  result round-trips with the decrypt path; a URL with no query string is left
+  unencrypted (only the query is encryptable). Each output line has a **Copy**
+  button. Handy for crafting or replaying
+  encrypted requests by hand. When the **URL** field holds a query string it's
+  broken out into a Postman-style **Query Params** table (enable checkbox · Key ·
+  Value · Description, with add/remove rows); editing the table rewrites the URL
+  and editing the URL rebuilds the table, so you can compose the query before
+  encrypting. Opening the tool hides the request list / detail view and the
+  resource-type filter row so you get a focused encrypt view; click **🔒 Encrypt
+  URL** again to close the tool and bring the network view back.
 - **Filter** — a Chrome-style filter mini-language (everything else is a plain
   URL substring; prefix a term with `-` to negate):
 

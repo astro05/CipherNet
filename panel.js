@@ -101,6 +101,8 @@ const els = {
   encryptClear: document.getElementById("encryptClear"),
   encStatus: document.getElementById("encStatus"),
   encOutput: document.getElementById("encOutput"),
+  encParams: document.getElementById("encParams"),
+  encParamsBody: document.getElementById("encParamsBody"),
   detailPane: document.getElementById("detailPane"),
   detailTabs: document.getElementById("detailTabs"),
   detailContent: document.getElementById("detailContent"),
@@ -217,18 +219,104 @@ els.encryptToggle.addEventListener("click", () => {
   els.main.hidden = open;
   els.filtersRow.hidden = open;
   els.encryptToggle.classList.toggle("active", open);
+  document.body.classList.toggle("encrypting", open); // lets the panel scroll
+  if (open) renderParamsFromUrl();
 });
 els.encryptBtn.addEventListener("click", runEncrypt);
 els.encUrl.addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); runEncrypt(); }
 });
+// Live Postman-style Query Params: parse the URL's query into an editable table.
+els.encUrl.addEventListener("input", renderParamsFromUrl);
 els.encryptClear.addEventListener("click", () => {
   els.encUrl.value = "";
   els.encBody.value = "";
   els.encOutput.hidden = true;
   els.encOutput.innerHTML = "";
+  renderParamsFromUrl(); // clears + hides the params table
   flashEnc("");
 });
+
+/* ---- Query Params editor (Postman-style, two-way bound to the URL) ---- */
+// Split a URL into the part before "?" and the raw query (no encrypt semantics).
+function urlBaseQuery(url) {
+  const i = url.indexOf("?");
+  return i === -1 ? { base: url, query: "" } : { base: url.slice(0, i), query: url.slice(i + 1) };
+}
+function parseQueryPairs(query) {
+  const pairs = [];
+  for (const part of query.split("&")) {
+    if (!part) continue;
+    const i = part.indexOf("=");
+    const k = i === -1 ? part : part.slice(0, i);
+    const v = i === -1 ? "" : part.slice(i + 1);
+    pairs.push({ key: safeDecode(k) ?? k, value: safeDecode(v) ?? v });
+  }
+  return pairs;
+}
+// One editable row: [enable] Key | Value | Description | [remove].
+function makeParamRow(key = "", value = "", enabled = true) {
+  const row = el("div", "ep-row");
+  const enWrap = el("span", "ep-col-enable");
+  const en = el("input", "ep-enable");
+  en.type = "checkbox";
+  en.checked = enabled;
+  enWrap.appendChild(en);
+  const mk = (cls, ph, val) => {
+    const inp = el("input", cls);
+    inp.type = "text";
+    inp.placeholder = ph;
+    inp.spellcheck = false;
+    inp.value = val;
+    return inp;
+  };
+  const actWrap = el("span", "ep-col-act");
+  const rm = el("button", "ep-remove", "✕");
+  rm.type = "button";
+  rm.title = "Remove parameter";
+  rm.addEventListener("click", () => { row.remove(); syncUrlFromParams(); });
+  actWrap.appendChild(rm);
+  row.append(enWrap, mk("ep-key", "Key", key), mk("ep-value", "Value", value), mk("ep-desc", "Description", ""), actWrap);
+  return row;
+}
+// Rebuild the params table from the URL's query (URL is the source of truth when
+// the user edits the URL text directly).
+function renderParamsFromUrl() {
+  const url = els.encUrl.value;
+  els.encParamsBody.innerHTML = "";
+  if (!url.trim()) { els.encParams.hidden = true; return; }
+  els.encParams.hidden = false;
+  for (const p of parseQueryPairs(urlBaseQuery(url).query)) {
+    els.encParamsBody.appendChild(makeParamRow(p.key, p.value, true));
+  }
+  els.encParamsBody.appendChild(makeParamRow()); // trailing "add" row
+}
+// Rebuild the URL's query from the table (the table is the source of truth while
+// the user edits params); keeps one empty trailing row like Postman.
+function syncUrlFromParams() {
+  const rows = [...els.encParamsBody.querySelectorAll(".ep-row")];
+  const query = rows
+    .map((r) => ({
+      on: r.querySelector(".ep-enable").checked,
+      key: r.querySelector(".ep-key").value,
+      value: r.querySelector(".ep-value").value,
+    }))
+    .filter((p) => p.on && p.key !== "")
+    .map((p) => encodeURIComponent(p.key) + "=" + encodeURIComponent(p.value))
+    .join("&");
+  const { base } = urlBaseQuery(els.encUrl.value);
+  els.encUrl.value = base + (query ? "?" + query : "");
+  ensureTrailingRow();
+}
+function ensureTrailingRow() {
+  const rows = [...els.encParamsBody.querySelectorAll(".ep-row")];
+  const last = rows[rows.length - 1];
+  if (!last) { els.encParamsBody.appendChild(makeParamRow()); return; }
+  const used = last.querySelector(".ep-key").value !== "" || last.querySelector(".ep-value").value !== "";
+  if (used) els.encParamsBody.appendChild(makeParamRow());
+}
+els.encParamsBody.addEventListener("input", syncUrlFromParams);
+els.encParamsBody.addEventListener("change", syncUrlFromParams);
 
 function flashEnc(msg, isErr) {
   els.encStatus.textContent = msg;
@@ -260,20 +348,27 @@ async function runEncrypt() {
   if (!url && !body.trim()) { flashEnc("Enter a URL or payload to encrypt.", true); return; }
   if (!state.key) { flashEnc("Set the AES key in 🔑 Key first.", true); return; }
 
+  // Only a URL's query string is encryptable; a URL with no query params is left
+  // as-is (there's nothing to encrypt in a bare path).
+  const { base, query } = url ? splitUrlForEncrypt(url) : { base: null, query: "" };
+  const hasQuery = base != null && query.trim() !== "";
+  const hasBody = body.trim() !== "";
+  if (url && !hasQuery && !hasBody) {
+    flashEnc("This URL has no query params to encrypt.", true);
+    return;
+  }
+
   flashEnc("Encrypting…");
   try {
     const out = el("div");
-    if (url) {
-      const { base, query } = splitUrlForEncrypt(url);
+    if (hasQuery) {
       const cipher = await CipherNetCrypto.encrypt(query, state.key, state.iv);
-      if (base != null) {
-        out.appendChild(encOutRow("Encrypted URL", base + "?" + cipher));
-        out.appendChild(encOutRow("Encrypted query", cipher));
-      } else {
-        out.appendChild(encOutRow("Encrypted", cipher));
-      }
+      out.appendChild(encOutRow("Encrypted URL", base + "?" + cipher));
+      out.appendChild(encOutRow("Encrypted query", cipher));
+    } else if (url) {
+      out.appendChild(el("div", "muted", "URL has no query params — left unencrypted."));
     }
-    if (body.trim()) {
+    if (hasBody) {
       const cipher = await CipherNetCrypto.encrypt(body, state.key, state.iv);
       out.appendChild(encOutRow("Encrypted body", cipher));
     }
