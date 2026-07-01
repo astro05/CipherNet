@@ -7,6 +7,7 @@ import { els } from "../core/els.js";
 import { el, copyBtn } from "../core/dom.js";
 import { CipherNetCrypto } from "../core/crypto.js";
 import { safeDecode, fmtTime, fmtSize, stripQuotes } from "../core/format.js";
+import { getCollections, setCollections } from "../services/storage.js";
 import { bodyView } from "./detail.js";
 import { showView, currentView } from "./views.js";
 
@@ -39,8 +40,150 @@ els.encryptClear.addEventListener("click", () => {
   els.encResponse.hidden = true;
   els.encResponse.innerHTML = "";
   renderParamsFromUrl(); // clears + hides the params table
+  currentRef = null;     // no longer editing a saved request
+  checkDirty();
+  closePanels();
   flashEnc("");
 });
+
+/* ------------------------------ collections ------------------------------ */
+// Folders of saved requests: { folderName: { apiName: { url, body, token } } }.
+// The toolbar's 📚 Collection (browse tree) and ➕ Add (save new) buttons drive
+// this; 💾 Save appears when a loaded request is modified so you can update it.
+let collections = {};
+let currentRef = null;      // { folder, name } of the loaded/saved request, or null
+let currentSnapshot = null; // { url, body, token } captured at load/save time
+
+getCollections().then(({ collections: c, legacy }) => {
+  collections = c || {};
+  // Migrate pre-2.9 flat saves into a "Default" folder the first time.
+  if (!c && legacy && Object.keys(legacy).length) {
+    collections = { Default: legacy };
+    setCollections(collections);
+  }
+});
+
+function snapshot() {
+  return { url: els.encUrl.value, body: els.encBody.value, token: els.encToken.value };
+}
+function sameSnapshot(a, b) {
+  return !!a && !!b && a.url === b.url && a.body === b.body && a.token === b.token;
+}
+// Show 💾 Save only when a saved request is loaded AND has been modified.
+function checkDirty() {
+  els.saveReqBtn.hidden = !(currentRef && !sameSnapshot(snapshot(), currentSnapshot));
+}
+[els.encUrl, els.encBody, els.encToken].forEach((elm) => elm.addEventListener("input", checkDirty));
+
+function closePanels() { els.addPanel.hidden = true; els.collectionPanel.hidden = true; }
+// Close the pop-panels when clicking anywhere outside the collection tools.
+document.addEventListener("click", (e) => {
+  if (e.target.closest && !e.target.closest("#encTools")) closePanels();
+});
+
+/* ---- ➕ Add: save the current request under an API name + folder ---- */
+els.addReqBtn.addEventListener("click", () => {
+  const willOpen = els.addPanel.hidden;
+  closePanels();
+  if (!willOpen) return;
+  const names = Object.keys(collections).sort();
+  els.addFolder.innerHTML = "";
+  if (!names.length) els.addFolder.appendChild(new Option("(use New folder below)", ""));
+  for (const n of names) els.addFolder.appendChild(new Option(n, n));
+  if (currentRef) els.addFolder.value = currentRef.folder;
+  els.addName.value = currentRef ? currentRef.name : "";
+  els.addNewFolder.value = "";
+  els.addPanel.hidden = false;
+  els.addName.focus();
+});
+els.addCancelBtn.addEventListener("click", () => { els.addPanel.hidden = true; });
+els.addSaveBtn.addEventListener("click", () => {
+  const name = els.addName.value.trim();
+  if (!name) { flashEnc("Enter an API name.", true); return; }
+  const folder = els.addNewFolder.value.trim() || els.addFolder.value || "Default";
+  if (!collections[folder]) collections[folder] = {};
+  collections[folder][name] = snapshot();
+  setCollections(collections, () => flashEnc(`Saved “${name}” to “${folder}” ✓`));
+  currentRef = { folder, name };
+  currentSnapshot = snapshot();
+  els.addPanel.hidden = true;
+  checkDirty();
+});
+
+/* ---- 💾 Save: update the currently-loaded request in place ---- */
+els.saveReqBtn.addEventListener("click", () => {
+  if (!currentRef) return;
+  if (!collections[currentRef.folder]) collections[currentRef.folder] = {};
+  collections[currentRef.folder][currentRef.name] = snapshot();
+  setCollections(collections, () => flashEnc(`Updated “${currentRef.name}” ✓`));
+  currentSnapshot = snapshot();
+  checkDirty();
+});
+
+/* ---- 📚 Collection: a tree of folders → APIs, each deletable ---- */
+els.collectionBtn.addEventListener("click", () => {
+  const willOpen = els.collectionPanel.hidden;
+  closePanels();
+  if (!willOpen) return;
+  renderCollectionTree();
+  els.collectionPanel.hidden = false;
+});
+function renderCollectionTree() {
+  const panel = els.collectionPanel;
+  panel.innerHTML = "";
+  const folders = Object.keys(collections).sort();
+  if (!folders.length) {
+    panel.appendChild(el("div", "muted-block", "No saved requests yet — use ➕ Add."));
+    return;
+  }
+  for (const folder of folders) {
+    const fRow = el("div", "tree-folder");
+    fRow.append(el("span", "tree-ic", "📁"), el("span", "tree-name", folder));
+    const fDel = el("button", "tree-del", "🗑");
+    fDel.title = "Delete folder and its requests";
+    fDel.addEventListener("click", (e) => { e.stopPropagation(); delFolder(folder); });
+    fRow.appendChild(fDel);
+    panel.appendChild(fRow);
+
+    const apis = Object.keys(collections[folder]).sort();
+    if (!apis.length) panel.appendChild(el("div", "tree-empty", "(empty)"));
+    for (const name of apis) {
+      const aRow = el("div", "tree-api" + (currentRef && currentRef.folder === folder && currentRef.name === name ? " active" : ""));
+      aRow.append(el("span", "tree-ic", "•"), el("span", "tree-name", name));
+      const aDel = el("button", "tree-del", "🗑");
+      aDel.title = "Delete request";
+      aDel.addEventListener("click", (e) => { e.stopPropagation(); delApi(folder, name); });
+      aRow.appendChild(aDel);
+      aRow.addEventListener("click", () => loadApi(folder, name));
+      panel.appendChild(aRow);
+    }
+  }
+}
+function loadApi(folder, name) {
+  const r = collections[folder] && collections[folder][name];
+  if (!r) return;
+  els.encUrl.value = r.url || "";
+  els.encBody.value = r.body || "";
+  els.encToken.value = r.token || "";
+  renderParamsFromUrl();
+  currentRef = { folder, name };
+  currentSnapshot = snapshot();
+  checkDirty();
+  els.collectionPanel.hidden = true;
+  flashEnc(`Loaded “${name}”`);
+}
+function delFolder(folder) {
+  delete collections[folder];
+  if (currentRef && currentRef.folder === folder) { currentRef = null; checkDirty(); }
+  setCollections(collections, () => flashEnc(`Folder “${folder}” deleted`));
+  renderCollectionTree();
+}
+function delApi(folder, name) {
+  if (collections[folder]) delete collections[folder][name];
+  if (currentRef && currentRef.folder === folder && currentRef.name === name) { currentRef = null; checkDirty(); }
+  setCollections(collections, () => flashEnc(`Deleted “${name}”`));
+  renderCollectionTree();
+}
 
 /* ---- Query Params editor (Postman-style, two-way bound to the URL) ---- */
 // Split a URL into the part before "?" and the raw query (no encrypt semantics).
@@ -112,6 +255,7 @@ function syncUrlFromParams() {
   const { base } = urlBaseQuery(els.encUrl.value);
   els.encUrl.value = base + (query ? "?" + query : "");
   ensureTrailingRow();
+  checkDirty(); // editing params changes the URL → maybe mark the request dirty
 }
 function ensureTrailingRow() {
   const rows = [...els.encParamsBody.querySelectorAll(".ep-row")];

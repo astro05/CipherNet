@@ -100,10 +100,22 @@ to .NET's default — so round-trips match byte-for-byte.
     Encrypt** encrypts the query string and body first, then sends; **Send
     Decrypt** sends the URL/body exactly as entered. The method is `GET` when
     there's no body, `POST` (JSON) when there is.
+  - **Collections (folders of saved requests)** — while the Encrypt URL view is
+    open, three tools appear in the toolbar after **🔓 Decrypt**:
+    - **➕ Add** — opens a small panel to name the request (**API name**) and pick
+      or create a **folder**, then saves it (URL, body, token) locally.
+    - **📚 Collection** — a dropdown **tree** of every folder → API; click an API
+      to load it, or use the **🗑** icon on any row to delete that folder (with
+      its requests) or a single request.
+    - **💾 Save** — appears only after you **load** a saved request and then
+      **modify** it, and updates that saved request in place.
+
+    Persisted in `chrome.storage`; pre-2.9 flat saves migrate into a **Default**
+    folder automatically.
   - **Response viewer** — a Postman-style panel: a status · time · size · method
     URL line, then tabs:
     - **Body** — the response body via `bodyView` (decrypted when possible, with
-      a raw/decrypted toggle and Copy).
+      a raw/decrypted toggle, a **Preview** table, and Copy).
     - **Headers** — the readable response headers (cross-origin responses only
       expose CORS-safelisted ones).
     - **Cookies** — any `Set-Cookie` the browser exposes (usually none — fetch
@@ -113,8 +125,14 @@ to .NET's default — so round-trips match byte-for-byte.
 - **Decrypt 🔓** — the quick reverse of Encrypt URL: paste any CipherNet-encrypted
   (Base64) value and click **Decrypt** (or **Ctrl/Cmd+Enter**) to get the
   plaintext, pretty-printed when it's JSON, with a **View raw / View decrypted**
-  toggle and a **Copy** button. It uses the saved key/IV and tries a few
-  encodings (trimmed, unquoted, percent-decoded).
+  toggle, a **Preview** table, and a **Copy** button. It uses the saved key/IV
+  and tries a few encodings (trimmed, unquoted, percent-decoded).
+  - **Preview** — when the decrypted body is tabular JSON (an array of objects,
+    an object, or an array), a **Preview** button beside the raw/decrypted toggle
+    shows it as a **table** with **click-to-sort** headers and a **per-column
+    filter** box. The **View raw / decrypted** toggle stays visible in Preview,
+    so one click jumps back to the text. Available anywhere a decrypted body is
+    shown (Decrypt tool, Encrypt URL response, and the request detail tabs).
   - **Paste a whole URL** — if the input is a URL whose query string is encrypted
     (`https://host/path?<ciphertext>`), the tool decrypts just the query and
     shows the **full decrypted URL** (with Copy), plus the decrypted query body.
@@ -243,6 +261,7 @@ ui with a single composition root:
 | `src/ui/theme.js`            | Auto dark/light theme                                |
 | `src/ui/table.js`            | Request list: columns, sort, resize, splitter        |
 | `src/ui/detail.js`           | Detail tabs (Headers/Payload/Preview/…)              |
+| `src/ui/jsonTable.js`        | Sortable / filterable JSON table (Preview)           |
 | `src/ui/views.js`            | Network / Encrypt URL / Decrypt view switcher        |
 | `src/ui/keyBox.js`           | 🔑 Key box                                           |
 | `src/ui/encryptTool.js`      | 🔒 Encrypt URL tool + Send Encrypt/Decrypt           |

@@ -12,6 +12,28 @@
         <button id="networkBtn" class="ghost active" title="Show the Network panel">🌐 Network</button>
         <button id="encryptToggle" class="ghost" title="Encrypt a URL / payload with the saved key">🔒 Encrypt URL</button>
         <button id="decryptToggle" class="ghost" title="Decrypt an encrypted value with the saved key">🔓 Decrypt</button>
+        <!-- Encrypt-URL collection tools: shown only while the Encrypt URL view is open. -->
+        <span id="encTools" class="enc-tools" hidden>
+          <span class="sep"></span>
+          <div class="menu-wrap">
+            <button id="collectionBtn" class="ghost" title="Browse saved collections (folders &amp; APIs)">📚 Collection</button>
+            <div id="collectionPanel" class="pop-panel tree-panel" hidden></div>
+          </div>
+          <div class="menu-wrap">
+            <button id="addReqBtn" title="Save this request to a collection">➕ Add</button>
+            <div id="addPanel" class="pop-panel" hidden>
+              <div class="pop-title">Save request to collection</div>
+              <label class="pop-field"><span>API name</span><input id="addName" type="text" spellcheck="false" placeholder="e.g. Login" /></label>
+              <label class="pop-field"><span>Folder</span><select id="addFolder"></select></label>
+              <label class="pop-field"><span>New folder (optional)</span><input id="addNewFolder" type="text" spellcheck="false" placeholder="create a new folder" /></label>
+              <div class="pop-actions">
+                <button id="addSaveBtn">Save</button>
+                <button id="addCancelBtn" class="ghost">Cancel</button>
+              </div>
+            </div>
+          </div>
+          <button id="saveReqBtn" title="Save changes to the loaded request" hidden>💾 Save</button>
+        </span>
         <!-- Network-only controls: shown in the Network view, hidden in the Encrypt URL / Decrypt tools. -->
         <span id="netControls" class="net-controls">
           <span class="sep"></span>
@@ -74,8 +96,8 @@
       <div class="tb-row encryptor" id="encryptRow">
         <div class="enc-inputs">
           <label class="enc-field"><span>URL</span><input id="encUrl" type="text" spellcheck="false" placeholder="https://api.company.com/path?foo=bar&amp;baz=1" /></label>
-          <label class="enc-field"><span>Payload / Body</span><textarea id="encBody" spellcheck="false" rows="2" placeholder='{"userId":42}'></textarea></label>
-          <label class="enc-field"><span>Bearer Token — not encrypted</span><textarea id="encToken" spellcheck="false" rows="2" placeholder="paste token — with or without &quot;Bearer &quot;"></textarea></label>
+          <label class="enc-field"><span>Payload / Body</span><textarea id="encBody" spellcheck="false" rows="1" placeholder='{"userId":42}'></textarea></label>
+          <label class="enc-field enc-field-token"><span>Bearer Token — not encrypted</span><textarea id="encToken" spellcheck="false" rows="1" placeholder="token (± &quot;Bearer &quot;)"></textarea></label>
           <div class="enc-actions">
             <button id="encryptBtn">Encrypt</button>
             <button id="encryptClear" class="ghost">Clear</button>

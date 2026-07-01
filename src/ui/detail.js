@@ -8,6 +8,7 @@ import { CipherNetCrypto } from "../core/crypto.js";
 import { formatBody, escapeHtml, safeDecode, fmtTime } from "../core/format.js";
 import { fetchContent } from "../services/capture.js";
 import { maybeHighlight } from "../services/search.js";
+import { jsonTableView } from "./jsonTable.js";
 
 let renderSeq = 0;
 function stale(seq) {
@@ -195,24 +196,49 @@ async function renderResponse(entry, seq) {
   s.appendChild(bodyView(res.ok ? res.text : null, raw, res));
 }
 
-/* A <pre> body view with a decrypted/raw toggle + copy. */
+/* A <pre> body view with a decrypted/raw toggle, a JSON table Preview, + copy. */
 export function bodyView(decrypted, raw, res) {
   const container = el("div");
   const bar = el("div", "dsection-title");
   bar.style.border = "none";
   bar.style.marginBottom = "4px";
   const toggle = el("button", "linkbtn");
-  const copy = el("button", "linkbtn", "Copy");
   bar.appendChild(toggle);
+
+  // Preview: when the decrypted body is tabular JSON, offer a sortable /
+  // filterable table view beside the raw/decrypted toggle.
+  const tableNode = decrypted != null ? jsonTableView(decrypted) : null;
+  let preview = null;
+  if (tableNode) {
+    preview = el("button", "linkbtn", "Preview");
+    preview.title = "Show as a sortable / filterable table";
+    tableNode.hidden = true;
+    bar.appendChild(preview);
+  }
+
+  const copy = el("button", "linkbtn", "Copy");
   bar.appendChild(copy);
   container.appendChild(bar);
 
   const pre = el("pre", "body");
   container.appendChild(pre);
+  if (tableNode) container.appendChild(tableNode);
 
   let showingRaw = decrypted == null;
+  let showTable = false;
   function render() {
-    if (showingRaw || decrypted == null) {
+    if (tableNode) {
+      tableNode.hidden = !showTable;
+      preview.classList.toggle("active", showTable);
+    }
+    pre.style.display = showTable ? "none" : "";
+    // Keep the raw/decrypted toggle visible & correctly labelled even while the
+    // Preview table is shown, so users can jump straight back to raw/decrypted.
+    const rawMode = showingRaw || decrypted == null;
+    toggle.textContent = rawMode ? "View decrypted" : "View raw";
+    if (showTable) return;
+
+    if (rawMode) {
       if (decrypted == null && res && !res.ok) {
         pre.classList.add("error");
         pre.innerHTML =
@@ -222,15 +248,15 @@ export function bodyView(decrypted, raw, res) {
         pre.classList.remove("error");
         pre.textContent = raw || "(empty)";
       }
-      toggle.textContent = "View decrypted";
     } else {
       pre.classList.remove("error");
       pre.innerHTML = formatBody(decrypted);
-      toggle.textContent = "View raw";
     }
   }
   render();
-  toggle.addEventListener("click", () => { showingRaw = !showingRaw; render(); });
+  // Clicking the raw/decrypted toggle always leaves the Preview table view.
+  toggle.addEventListener("click", () => { showTable = false; showingRaw = !showingRaw; render(); });
+  if (preview) preview.addEventListener("click", () => { showTable = !showTable; render(); });
   copy.addEventListener("click", () => {
     const text = showingRaw || decrypted == null ? raw || "" : decrypted;
     navigator.clipboard.writeText(text).then(() => {

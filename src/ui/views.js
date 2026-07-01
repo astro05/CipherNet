@@ -29,6 +29,10 @@ export function showView(name) {
   els.encryptRow.classList.toggle("open", name === "encrypt");
   els.decryptRow.classList.toggle("open", name === "decrypt");
 
+  // The Collection / Add / Save tools belong to the Encrypt URL view only.
+  els.encTools.hidden = name !== "encrypt";
+  if (name !== "encrypt") { els.addPanel.hidden = true; els.collectionPanel.hidden = true; }
+
   els.networkBtn.classList.toggle("active", isNet);
   els.encryptToggle.classList.toggle("active", name === "encrypt");
   els.decryptToggle.classList.toggle("active", name === "decrypt");

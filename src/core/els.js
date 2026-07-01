@@ -32,6 +32,18 @@ export const els = {
   sendEncryptBtn: document.getElementById("sendEncryptBtn"),
   sendDecryptBtn: document.getElementById("sendDecryptBtn"),
   encResponse: document.getElementById("encResponse"),
+  // collections: toolbar tools (Collection / Add / Save) + their pop-panels
+  encTools: document.getElementById("encTools"),
+  collectionBtn: document.getElementById("collectionBtn"),
+  collectionPanel: document.getElementById("collectionPanel"),
+  addReqBtn: document.getElementById("addReqBtn"),
+  addPanel: document.getElementById("addPanel"),
+  addName: document.getElementById("addName"),
+  addFolder: document.getElementById("addFolder"),
+  addNewFolder: document.getElementById("addNewFolder"),
+  addSaveBtn: document.getElementById("addSaveBtn"),
+  addCancelBtn: document.getElementById("addCancelBtn"),
+  saveReqBtn: document.getElementById("saveReqBtn"),
   // network / decrypt views (leading toolbar buttons)
   networkBtn: document.getElementById("networkBtn"),
   netControls: document.getElementById("netControls"),

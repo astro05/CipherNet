@@ -270,7 +270,57 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   resize: vertical;
   font-family: Consolas, monospace;
 }
-.enc-actions { display: flex; align-items: center; gap: 8px; align-self: flex-end; padding-bottom: 1px; }
+/* Bearer Token is a small, single-line-ish box (task: decrease it). */
+.enc-field-token textarea { width: 210px; }
+/* All Encrypt-URL fields are one line tall, matching the URL box height, so the
+   URL / Payload / Bearer Token boxes (and the buttons beside them) line up. */
+.enc-inputs input, .enc-inputs textarea { height: 26px; min-height: 26px; }
+/* Action buttons sit beside the Bearer Token box, aligned to its bottom edge. */
+.enc-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; align-self: flex-end; padding-bottom: 1px; }
+
+/* collection tools live in the toolbar; display:contents lets them flow in the
+   flex row, and they're shown only in the Encrypt URL view. */
+.enc-tools { display: contents; }
+.enc-tools[hidden] { display: none; }
+
+/* Add / Collection pop-panels (anchored under their toolbar buttons) */
+.pop-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: var(--shadow);
+  padding: 8px;
+  min-width: 240px;
+}
+.pop-panel[hidden] { display: none; }
+.pop-title { font-weight: 600; margin-bottom: 6px; }
+.pop-field { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.pop-field > span { color: var(--muted); font-size: 11px; }
+.pop-field input, .pop-field select { width: 100%; }
+.pop-actions { display: flex; gap: 8px; margin-top: 4px; }
+
+/* Collection tree (folders → APIs) with per-row delete */
+.tree-panel { max-height: 340px; overflow: auto; min-width: 280px; padding: 4px; }
+.tree-folder { display: flex; align-items: center; gap: 6px; padding: 4px 4px; font-weight: 600; }
+.tree-api {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 20px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.tree-api:hover { background: var(--hover); }
+.tree-api.active { background: var(--sel); color: var(--sel-fg); }
+.tree-ic { flex: 0 0 auto; color: var(--muted); }
+.tree-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-empty { color: var(--muted); padding: 2px 4px 4px 20px; font-size: 11px; }
+.tree-del { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 0 4px; font-size: 12px; line-height: 1; }
+.tree-del:hover { color: var(--err); }
 #encStatus.err { color: var(--err); }
 .enc-output { display: flex; flex-direction: column; gap: 6px; }
 .enc-output[hidden] { display: none; }
@@ -358,6 +408,33 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 #toolbar #decryptClear { background: #6b7280; border-color: #6b7280; color: #fff; }
 #toolbar #decryptBtn:hover,
 #toolbar #decryptClear:hover { filter: brightness(1.12); }
+
+/* -------- colourful toolbar buttons (every button gets a colour) -------- */
+/* leading view switchers: coloured outline, solid fill when active */
+#toolbar #keysToggle    { color: #d97706; border-color: #d97706; }
+#toolbar #networkBtn    { color: #2563eb; border-color: #2563eb; }
+#toolbar #encryptToggle { color: #0d9488; border-color: #0d9488; }
+#toolbar #decryptToggle { color: #7c3aed; border-color: #7c3aed; }
+#toolbar #keysToggle.active    { background: #d97706; color: #fff; }
+#toolbar #networkBtn.active    { background: #2563eb; color: #fff; }
+#toolbar #encryptToggle.active { background: #0d9488; color: #fff; }
+#toolbar #decryptToggle.active { background: #7c3aed; color: #fff; }
+/* network-control buttons */
+#toolbar #clearBtn       { color: #ef4444; border-color: #ef4444; }
+#toolbar #searchToggle   { color: #4f46e5; border-color: #4f46e5; }
+#toolbar #exportBtn      { color: #0891b2; border-color: #0891b2; }
+#toolbar #moreFiltersBtn { color: #0891b2; border-color: #0891b2; }
+/* key box */
+#toolbar #saveKey  { background: #16a34a; border-color: #16a34a; color: #fff; }
+#toolbar #resetKey { color: #ef4444; border-color: #ef4444; }
+/* search nav */
+#toolbar #searchPrev, #toolbar #searchNext { color: #4f46e5; border-color: #4f46e5; }
+#toolbar #searchClose { color: #ef4444; border-color: #ef4444; }
+/* collection tools: Collection (cyan), Add + Add-panel Save (green), Save (blue) */
+#toolbar #collectionBtn { color: #0891b2; border-color: #0891b2; }
+#toolbar #addReqBtn  { background: #16a34a; border-color: #16a34a; color: #fff; }
+#toolbar #addSaveBtn { background: #16a34a; border-color: #16a34a; color: #fff; }
+#toolbar #saveReqBtn { background: #2563eb; border-color: #2563eb; color: #fff; }
 
 /* Postman-style response viewer */
 .enc-response { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
@@ -563,13 +640,14 @@ tr.selected .status-ok, tr.selected .status-bad { color: inherit; }
 .linkbtn {
   background: transparent;
   border: 1px solid var(--border);
-  color: var(--muted);
+  color: var(--accent);
   border-radius: 3px;
   padding: 1px 6px;
   cursor: pointer;
   font-size: 11px;
 }
-.linkbtn:hover { color: var(--fg); }
+.linkbtn:hover { color: var(--fg); border-color: var(--accent); }
+.linkbtn.active { background: var(--accent); border-color: var(--accent); color: var(--sel-fg); }
 
 pre.body {
   margin: 0;
@@ -613,6 +691,49 @@ mark.hl.current { background: var(--hl-cur-bg); color: var(--hl-cur-fg); }
 .jt-key { color: var(--tok-key); }
 .jt-meta { color: var(--muted); }
 .preview-img { max-width: 100%; background: var(--img-bg); padding: 6px; border-radius: 4px; }
+
+/* ---------------- JSON table preview (sortable / filterable) ------------- */
+.jtable-wrap { overflow: auto; max-height: 440px; border: 1px solid var(--border); border-radius: 4px; }
+.jtable { border-collapse: collapse; width: 100%; font-family: Consolas, monospace; font-size: 12px; }
+.jtable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg2);
+  vertical-align: top;
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+.jt-h { display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--fg); font-weight: 600; white-space: nowrap; -webkit-user-select: none; user-select: none; }
+.jt-h:hover { color: var(--accent); }
+.jt-h-arrow { color: var(--accent); font-size: 10px; }
+.jt-filter {
+  margin-top: 3px;
+  width: 100%;
+  min-width: 60px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: inherit;
+  font-size: 11px;
+}
+.jt-filter:focus { outline: none; border-color: var(--accent); }
+.jtable td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--row-border);
+  border-right: 1px solid var(--row-border);
+  vertical-align: top;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 340px;
+}
+.jtable tbody tr:nth-child(even) { background: var(--stripe); }
+.jtable tbody tr:hover { background: var(--bg2); }
+.jtable-count { color: var(--muted); padding: 4px 4px 2px; font-size: 11px; }
 
 /* ------------------------------- timing -------------------------------- */
 .timing-grid { display: grid; grid-template-columns: 150px 1fr 80px; gap: 4px 10px; align-items: center; }
