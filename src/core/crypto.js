@@ -1,4 +1,4 @@
-// crypto.js — AES-128-CBC decrypt/encrypt that mirrors the CipherNet backend.
+// core/crypto.js — AES-128-CBC decrypt/encrypt that mirrors the CipherNet backend.
 //
 // Backend reference (EncryptionMiddleware.cs):
 //   Aes aes = Aes.Create();                       // CBC + PKCS7 (the .NET defaults)
@@ -9,7 +9,7 @@
 // The key/IV are entered by the user in the panel (nothing is baked in here).
 // Web Crypto's AES-CBC uses PKCS7 padding, so it matches the .NET output exactly.
 
-const CipherNetCrypto = (() => {
+export const CipherNetCrypto = (() => {
   const enc = new TextEncoder();
   const dec = new TextDecoder();
 

@@ -66,9 +66,19 @@ to .NET's default — so round-trips match byte-for-byte.
     breakdown with proportional bars.
   - **Cookies** — parsed Request and Response (Set-Cookie) cookie tables.
   - **Initiator** — initiator type, URL, and JS call stack when available.
+- **Leading toolbar buttons** — right after the CipherNet icon sit the view
+  switchers: **🔑 Key**, **🌐 Network**, **🔒 Encrypt URL** and **🔓 Decrypt**.
+  **Network** is the default view (the request list + detail pane); the Encrypt
+  URL and Decrypt tools open in place of it, and **🌐 Network** (or clicking the
+  active tool again) brings the list back. The network-only toolbar controls
+  (Record, Clear, Preserve log, Disable cache, Throttling, Search, Filter,
+  Encrypted only, Export) show **only in the Network view** and are hidden while a
+  tool is open, so the view switchers stay uncluttered.
 - **Key 🔑** — starts empty: enter your AES key and **Save** (the **IV** is
-  optional and defaults to the key). Persists via `chrome.storage` and
-  re-renders the open request live. **Clear** wipes the stored key.
+  optional and defaults to the key). Saving persists it via `chrome.storage`,
+  re-renders the open request live, and **auto-closes the Key box**. While no key
+  is saved the **🔑 Key** button **blinks red** so it's obvious one is needed.
+  **Clear** wipes the stored key (and starts the blink again).
 - **Encrypt URL 🔒** — a small tool that does the reverse of decryption: paste a
   plaintext **URL** and/or a **Payload / Body** and click **Encrypt** to get the
   CipherNet-encrypted output (AES-128-CBC → Base64, using the saved key/IV). The URL's
@@ -81,8 +91,8 @@ to .NET's default — so round-trips match byte-for-byte.
   Value · Description, with add/remove rows); editing the table rewrites the URL
   and editing the URL rebuilds the table, so you can compose the query before
   encrypting. Opening the tool hides the request list / detail view and the
-  resource-type filter row so you get a focused encrypt view; click **🔒 Encrypt
-  URL** again to close the tool and bring the network view back.
+  resource-type filter row so you get a focused encrypt view; click **🌐 Network**
+  (or **🔒 Encrypt URL** again) to bring the network view back.
   - **Bearer Token** — a field beside Payload/Body for an `Authorization` token.
     It is **never encrypted**; it's sent as-is (with `Bearer ` prepended if you
     omit it) on the Send requests below.
@@ -92,6 +102,12 @@ to .NET's default — so round-trips match byte-for-byte.
     then sends; **Send Decrypt** sends the URL/body exactly as entered and shows
     the (decrypted, when possible) response. The method is `GET` when there's no
     body, `POST` (JSON) when there is.
+- **Decrypt 🔓** — the quick reverse of Encrypt URL: paste any CipherNet-encrypted
+  (Base64) value and click **Decrypt** (or **Ctrl/Cmd+Enter**) to get the
+  plaintext, pretty-printed when it's JSON, with a **View raw / View decrypted**
+  toggle and a **Copy** button. It uses the saved key/IV and tries a few
+  encodings (trimmed, unquoted, percent-decoded), falling back to a best-effort
+  no-padding decrypt so odd-padded values still come out as text.
 - **Filter** — a Chrome-style filter mini-language (everything else is a plain
   URL substring; prefix a term with `-` to negate):
 
@@ -185,22 +201,44 @@ controls. Larger PRD items still open:
 
 ## Files
 
-| File           | Purpose                                            |
-| -------------- | -------------------------------------------------- |
-| `manifest.json`| MV3 manifest, registers the devtools page          |
-| `devtools.js`  | Creates the "CipherNet" panel                   |
-| `panel.html/css`| Panel UI                                          |
-| `panel.js`     | Captures requests, decrypts, renders               |
-| `crypto.js`    | AES-128-CBC decrypt/encrypt (mirrors the backend)  |
-| `selftest.mjs` | `node selftest.mjs` — verifies crypto vs. .NET     |
+The panel is built as small ES modules under `src/`, layered core → services →
+ui with a single composition root:
+
+| Path                         | Purpose                                              |
+| ---------------------------- | ---------------------------------------------------- |
+| `manifest.json`              | MV3 manifest, registers the devtools page            |
+| `devtools.js`                | Creates the "CipherNet" panel                     |
+| `assets/`                    | Extension icons (`icon16/32/48/128.png`, `favicon`)  |
+| `panel.html` / `panel.css`   | Panel markup + styles                                |
+| `src/main.js`                | Composition root: wires modules, applies settings    |
+| `src/core/crypto.js`         | AES-128-CBC decrypt/encrypt (mirrors the backend)    |
+| `src/core/format.js`         | Pure formatting / parsing helpers                    |
+| `src/core/dom.js`            | Tiny DOM/util primitives (`el`, `copyBtn`, debounce) |
+| `src/core/state.js`          | The single mutable app-state store                   |
+| `src/core/els.js`            | Cached DOM element references                        |
+| `src/services/storage.js`    | Persistence boundary over `chrome.storage.local`     |
+| `src/services/capture.js`    | Network capture + response fetch + decryption        |
+| `src/services/filters.js`    | Filter engine, resource-type pills, more-filters     |
+| `src/services/search.js`     | Global search + in-pane highlighting                 |
+| `src/services/exporter.js`   | HAR / JSON / CSV / decrypted-session export          |
+| `src/services/networkControls.js` | Preserve log / Disable cache / Throttling       |
+| `src/ui/theme.js`            | Auto dark/light theme                                |
+| `src/ui/table.js`            | Request list: columns, sort, resize, splitter        |
+| `src/ui/detail.js`           | Detail tabs (Headers/Payload/Preview/…)              |
+| `src/ui/views.js`            | Network / Encrypt URL / Decrypt view switcher        |
+| `src/ui/keyBox.js`           | 🔑 Key box                                           |
+| `src/ui/encryptTool.js`      | 🔒 Encrypt URL tool + Send Encrypt/Decrypt           |
+| `src/ui/decryptTool.js`      | 🔓 Decrypt tool (paste ciphertext → plaintext)       |
+| `selftest.mjs`               | `node selftest.mjs` — verifies crypto vs. .NET       |
 
 ## Ship an obfuscated build
 
 Chrome must load plaintext JS, so the source can't be truly *encrypted* — but it
-can be **obfuscated** so it's impractical to read. The build runs the three
-shipped JS files (`devtools.js`, `crypto.js`, `panel.js`) through
+can be **obfuscated** so it's impractical to read. The build runs every shipped
+JS file (`devtools.js` plus the whole `src/` ES-module tree) through
 [`javascript-obfuscator`](https://github.com/javascript-obfuscator/javascript-obfuscator)
-and copies the static assets (manifest, HTML, CSS, icons) verbatim into `dist/`.
+and copies the static assets (manifest, HTML, CSS, icons) verbatim into `dist/`,
+preserving the directory layout (`dist/src/…`).
 
 ```
 npm install      # once, pulls in javascript-obfuscator (dev only)
@@ -213,8 +251,8 @@ Notes:
 
 - The obfuscator is configured for MV3: `debugProtection`/`selfDefending` are
   **off** (they inject `new Function(...)`, which the MV3 content-security policy
-  blocks), and `renameGlobals`/`renameProperties` are **off** so the cross-file
-  `CipherNetCrypto` global and `chrome.*` APIs keep working.
+  blocks), and `renameGlobals`/`renameProperties` are **off** so the ES
+  `import`/`export` bindings, `chrome.*` APIs and DOM property names keep working.
 - Obfuscation raises the bar; it is **not** real protection. Anyone determined
   can still beautify and trace the code, and no secret key is in the extension
   anyway — the AES key is typed in at runtime.

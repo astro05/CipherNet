@@ -3,7 +3,7 @@
 //   node selftest.mjs
 //
 // 1. Encrypts a sample the *backend* way (Node `crypto`, AES-128-CBC + PKCS7).
-// 2. Decrypts it the *extension* way (Web Crypto, exactly as crypto.js does).
+// 2. Decrypts it the *extension* way (Web Crypto, exactly as src/core/crypto.js does).
 // 3. Confirms the round-trip and that the backend's known IV/key sizes hold.
 
 import { createCipheriv } from "node:crypto";

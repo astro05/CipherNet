@@ -7,31 +7,37 @@
   <body>
     <div id="toolbar">
       <div class="tb-row">
-        <img id="logo" src="icon16.png" alt="CipherNet" title="CipherNet" />
-        <button id="pauseBtn" class="record recording" title="Stop / resume capturing">●</button>
-        <button id="clearBtn" title="Clear the list">🗑</button>
-        <span class="sep"></span>
-        <label class="chk" title="Keep requests across page navigations"><input type="checkbox" id="preserveLog" /> Preserve log</label>
-        <label class="chk" title="Disable HTTP cache for the inspected tab"><input type="checkbox" id="disableCache" /> Disable cache</label>
-        <select id="throttle" title="Network throttling"></select>
-        <span id="throttleNote" class="muted"></span>
-        <span class="sep"></span>
-        <button id="searchToggle" class="ghost" title="Search (Ctrl+F)">🔍</button>
-        <input id="filter" type="text" placeholder="Filter — e.g. method:POST status-code:200 larger-than:10k" />
-        <label class="chk"><input type="checkbox" id="onlyApi" /> Encrypted only</label>
-        <span class="sep"></span>
-        <div class="menu-wrap">
-          <button id="exportBtn" class="ghost" title="Export captured requests">⬇ Export ▾</button>
-          <div id="exportMenu" class="menu" hidden>
-            <button data-fmt="har">HAR (.har)</button>
-            <button data-fmt="json">JSON</button>
-            <button data-fmt="csv">CSV</button>
-            <button data-fmt="decrypted">Decrypted session</button>
-          </div>
-        </div>
+        <img id="logo" src="assets/icon16.png" alt="CipherNet" title="CipherNet" />
         <button id="keysToggle" class="ghost" title="Key settings">🔑 Key</button>
+        <button id="networkBtn" class="ghost active" title="Show the Network panel">🌐 Network</button>
         <button id="encryptToggle" class="ghost" title="Encrypt a URL / payload with the saved key">🔒 Encrypt URL</button>
-        <span id="count" class="count">0 requests</span>
+        <button id="decryptToggle" class="ghost" title="Decrypt an encrypted value with the saved key">🔓 Decrypt</button>
+        <!-- Network-only controls: shown in the Network view, hidden in the Encrypt URL / Decrypt tools. -->
+        <span id="netControls" class="net-controls">
+          <span class="sep"></span>
+          <button id="pauseBtn" class="record recording" title="Stop / resume capturing">●</button>
+          <button id="clearBtn" title="Clear the list">🗑</button>
+          <span class="sep"></span>
+          <label class="chk" title="Keep requests across page navigations"><input type="checkbox" id="preserveLog" /> Preserve log</label>
+          <label class="chk" title="Disable HTTP cache for the inspected tab"><input type="checkbox" id="disableCache" /> Disable cache</label>
+          <select id="throttle" title="Network throttling"></select>
+          <span id="throttleNote" class="muted"></span>
+          <span class="sep"></span>
+          <button id="searchToggle" class="ghost" title="Search (Ctrl+F)">🔍</button>
+          <input id="filter" type="text" placeholder="Filter — e.g. method:POST status-code:200 larger-than:10k" />
+          <label class="chk"><input type="checkbox" id="onlyApi" /> Encrypted only</label>
+          <span class="sep"></span>
+          <div class="menu-wrap">
+            <button id="exportBtn" class="ghost" title="Export captured requests">⬇ Export ▾</button>
+            <div id="exportMenu" class="menu" hidden>
+              <button data-fmt="har">HAR (.har)</button>
+              <button data-fmt="json">JSON</button>
+              <button data-fmt="csv">CSV</button>
+              <button data-fmt="decrypted">Decrypted session</button>
+            </div>
+          </div>
+          <span id="count" class="count">0 requests</span>
+        </span>
       </div>
       <div class="tb-row search" id="searchRow">
         <input id="searchInput" type="text" placeholder="Search URL, headers, cookies, request & response (incl. decrypted)…" />
@@ -94,6 +100,20 @@
         <div id="encOutput" class="enc-output" hidden></div>
         <div id="encResponse" class="enc-response" hidden></div>
       </div>
+      <div class="tb-row decryptor" id="decryptRow">
+        <div class="enc-inputs">
+          <label class="enc-field enc-field-wide">
+            <span>Encrypted value</span>
+            <textarea id="decInput" spellcheck="false" rows="3" placeholder="paste the encrypted (Base64) value — decrypts with the saved key/IV"></textarea>
+          </label>
+          <div class="enc-actions">
+            <button id="decryptBtn" title="Decrypt (Ctrl/Cmd+Enter)">Decrypt</button>
+            <button id="decryptClear" class="ghost">Clear</button>
+            <span id="decStatus" class="muted"></span>
+          </div>
+        </div>
+        <div id="decOutput" class="enc-output" hidden></div>
+      </div>
     </div>
 
     <div id="main">
@@ -128,7 +148,6 @@
       </div>
     </div>
 
-    <script src="crypto.js"></script>
-    <script src="panel.js"></script>
+    <script type="module" src="src/main.js"></script>
   </body>
 </html>

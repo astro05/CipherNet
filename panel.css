@@ -1,4 +1,4 @@
-/* Dark is the default; panel.js adds data-theme="light" on <html> when the
+/* Dark is the default; src/ui/theme.js adds data-theme="light" on <html> when the
    DevTools/browser theme is light. Every color below is a variable so the
    light override (next block) is the only place that needs to change. */
 :root {
@@ -89,13 +89,19 @@ body { display: flex; flex-direction: column; }
   border-bottom: 1px solid var(--border);
   padding: 5px 8px;
 }
-/* In Encrypt URL mode the network view is hidden, so let the toolbar (the whole
-   Encrypt URL panel) take the remaining height and scroll when it overflows. */
-body.encrypting #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* In a tool view (Encrypt URL / Decrypt) the network list is hidden, so let the
+   toolbar (the whole tool drawer) take the remaining height and scroll when it
+   overflows. */
+body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .tb-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* .tb-row sets display:flex, which beats the UA [hidden] rule, so hide rows
    explicitly when a row is collapsed (e.g. filters row in Encrypt URL mode). */
 .tb-row[hidden] { display: none; }
+/* Network-only controls: display:contents lets the children lay out in the
+   toolbar flex row directly; hidden (in the Encrypt URL / Decrypt views) removes
+   them and their whole subtree. */
+.net-controls { display: contents; }
+.net-controls[hidden] { display: none; }
 #logo { width: 16px; height: 16px; flex: 0 0 auto; image-rendering: -webkit-optimize-contrast; }
 .tb-row + .tb-row { margin-top: 5px; }
 .sep { width: 1px; height: 16px; background: var(--border); }
@@ -211,6 +217,16 @@ body.encrypting #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 #toolbar button.record.recording { color: var(--err); }
 /* toggled-on toolbar button (e.g. Encrypt URL while its tool is open) */
 #toolbar button.active { background: var(--sel); border-color: var(--accent); color: var(--sel-fg); }
+/* blink the 🔑 Key button RED while no key is saved so the user notices it's needed */
+@keyframes keyBlink {
+  0%, 100% { background: #dc2626; border-color: #dc2626; color: #fff; }
+  50%      { background: transparent; border-color: var(--border); color: var(--fg); }
+}
+#toolbar button.needs-key { animation: keyBlink 1s ease-in-out infinite; }
+#toolbar button.needs-key:hover { background: #dc2626; border-color: #dc2626; color: #fff; }
+@media (prefers-reduced-motion: reduce) {
+  #toolbar button.needs-key { animation: none; background: #dc2626; border-color: #dc2626; color: #fff; }
+}
 
 #toolbar select {
   background: var(--bg3);
@@ -232,9 +248,14 @@ body.encrypting #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .keys label { display: flex; align-items: center; gap: 4px; }
 .keys input { width: 200px; font-family: Consolas, monospace; }
 
-/* Encrypt URL tool (drawer) */
-.encryptor { display: none; flex-direction: column; align-items: stretch; gap: 8px; }
-.encryptor.open { display: flex; }
+/* Encrypt URL / Decrypt tools (drawers) */
+.encryptor, .decryptor { display: none; flex-direction: column; align-items: stretch; gap: 8px; }
+.encryptor.open, .decryptor.open { display: flex; }
+/* the Decrypt drawer's input spans the row and its textarea fills its column */
+.enc-field-wide { flex: 1 1 480px; }
+.enc-field-wide textarea { width: 100%; }
+#decInput { width: 480px; max-width: 100%; }
+#decStatus.err { color: var(--err); }
 .enc-inputs { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
 .enc-field { display: flex; flex-direction: column; gap: 2px; }
 .enc-field > span { color: var(--muted); font-size: 11px; }
@@ -320,8 +341,18 @@ body.encrypting #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 }
 .ep-remove:hover { color: var(--err); }
 
-/* Send Encrypt / Send Decrypt + Postman-style response viewer */
-#sendEncryptBtn, #sendDecryptBtn { border-color: var(--accent); color: var(--accent); }
+/* Encrypt URL drawer action buttons — fixed brand colors (solid fill, white text).
+   The #toolbar #id selectors outrank #toolbar button / .ghost so the fills win. */
+#toolbar #encryptBtn     { background: #2563eb; border-color: #2563eb; color: #fff; }
+#toolbar #encryptClear   { background: #6b7280; border-color: #6b7280; color: #fff; }
+#toolbar #sendEncryptBtn { background: #16a34a; border-color: #16a34a; color: #fff; }
+#toolbar #sendDecryptBtn { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+#toolbar #encryptBtn:hover,
+#toolbar #encryptClear:hover,
+#toolbar #sendEncryptBtn:hover,
+#toolbar #sendDecryptBtn:hover { filter: brightness(1.12); }
+
+/* Postman-style response viewer */
 .enc-response { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 .enc-response[hidden] { display: none; }
 .resp-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-family: Consolas, monospace; }
