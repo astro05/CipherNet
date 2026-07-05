@@ -481,17 +481,21 @@ function renderResponseView(entry) {
 }
 
 // Body tab: reuses bodyView (decrypted text when it decrypts, raw + reason when
-// not), with a note when the decrypt was lenient / best-effort.
+// not), with a note when the decrypt was lenient / best-effort. When decryption
+// fails outright, that almost always means the response simply wasn't
+// encrypted (e.g. a plain endpoint hit via Send Decrypt) rather than a real
+// error, so it's shown as plain raw output instead of a decrypt-failure note.
 function respBody(entry) {
   if (!entry.body) return el("div", "muted-block", "No response body.");
   const wrap = el("div");
   const res = entry.decRes;
-  if (res && res.ok && res.lenient) {
+  const ok = !!(res && res.ok);
+  if (ok && res.lenient) {
     wrap.appendChild(el("div", "muted-block", `Lenient decrypt: dropped ${res.dropped} ragged tail byte(s).`));
-  } else if (res && res.ok && res.forced) {
+  } else if (ok && res.forced) {
     wrap.appendChild(el("div", "muted-block", "Decrypted best-effort (response padding ignored)."));
   }
-  wrap.appendChild(bodyView(res && res.ok ? res.text : null, entry.body, res));
+  wrap.appendChild(bodyView(ok ? res.text : null, entry.body, ok ? res : null));
   return wrap;
 }
 

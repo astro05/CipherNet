@@ -1,4 +1,4 @@
-**Version:** 2.12.0 | **Last Modified:** 2026-07-05
+**Version:** 2.12.1 | **Last Modified:** 2026-07-05
 
 # Features
 
@@ -50,6 +50,7 @@
 - **Round-trip encryption** — encrypted query strings (`path?<ciphertext>`) round-trip with decrypt path
 - **Send Decrypt button** — fire the request as-is (GET when no body, POST/JSON when body present)
 - **Send Encrypt button** — encrypt query string and body, then fire the request
+- **Unencrypted response passthrough** — when a sent request's response can't be decrypted, it's shown as plain raw output (not flagged as a decrypt error), since that's the expected result for a plaintext response
 
 ## Filtering
 - **Custom filter mini-language** — search by method, status, domain, host, scheme, mime-type, protocol, size, headers, running state, cache status, encryption state, API name
