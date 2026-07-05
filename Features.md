@@ -1,4 +1,4 @@
-**Version:** 2.11.1 | **Last Modified:** 2026-07-01
+**Version:** 2.12.0 | **Last Modified:** 2026-07-05
 
 # Features
 
@@ -66,6 +66,7 @@
 - **Key persistence** — stored key persists across DevTools sessions
 
 ## Network Capture
+- **Auto capture on Inspect** — capturing starts the instant DevTools opens (before the CipherNet tab is even clicked); requests that fire while you're still on Elements/Console/Network are buffered and replayed once the panel loads, so nothing is missed
 - **Capture toggle** — Record button to start/stop capturing requests (red = recording)
 - **Clear list** — 🗑 button to wipe all captured requests
 - **Decryption pipeline** — automatic decryption of requests/responses when key is present

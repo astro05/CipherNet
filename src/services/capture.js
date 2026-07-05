@@ -7,7 +7,7 @@ import { rawQuery, looksEncrypted, safeDecode, safeAtob } from "../core/format.j
 import { addRow, updateCount, applySortDebounced } from "../ui/table.js";
 import { searchDebounced } from "./search.js";
 
-chrome.devtools.network.onRequestFinished.addListener((har) => {
+function ingestHar(har) {
   if (state.paused) return;
 
   const url = har.request.url;
@@ -43,7 +43,17 @@ chrome.devtools.network.onRequestFinished.addListener((har) => {
   updateCount();
   if (state.sort.col && state.sort.dir) applySortDebounced(); // keep sort order live
   if (state.search.active && state.search.regex) searchDebounced(); // index the new request
-});
+}
+
+chrome.devtools.network.onRequestFinished.addListener(ingestHar);
+
+// Chrome doesn't load this panel's page until the user actually switches to
+// the CipherNet tab, so devtools.js buffers any requests fired before that
+// (from the moment Inspect/DevTools opens) and hands them to us here once
+// this page is up, so nothing that happened before the first click is lost.
+window.__ciphernetFlushBuffered = function (hars) {
+  hars.forEach(ingestHar);
+};
 
 function pickSize(har) {
   const c = har.response.content;

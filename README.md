@@ -1,4 +1,4 @@
-**Version:** 2.11.1 | **Last Modified:** 2026-07-01
+**Version:** 2.12.0 | **Last Modified:** 2026-07-05
 
 # CipherNet (Chrome DevTools extension)
 
@@ -189,6 +189,10 @@ to .NET's default — so round-trips match byte-for-byte.
 - **Resizable layout** — drag the **splitter** between the request list and the
   detail pane to resize (double-click it to reset); the width persists.
 - **● Record** — toggle capturing (red = recording). **🗑** clears the list.
+- **Auto capture on Inspect** — recording starts the moment DevTools opens, not
+  just once you click the CipherNet tab. Chrome only loads a panel's page
+  once it's first shown, so `devtools.js` buffers requests from the instant
+  Inspect mode opens and replays them into the panel as soon as it loads.
 
 ### Network controls (like Chrome DevTools)
 
@@ -246,7 +250,7 @@ ui with a single composition root:
 | Path                         | Purpose                                              |
 | ---------------------------- | ---------------------------------------------------- |
 | `manifest.json`              | MV3 manifest, registers the devtools page            |
-| `devtools.js`                | Creates the "CipherNet" panel                     |
+| `devtools.js`                | Creates the "CipherNet" panel; buffers requests from the moment Inspect mode opens until the panel is first shown |
 | `assets/`                    | Extension icons (`icon16/32/48/128.png`, `favicon`)  |
 | `panel.html` / `panel.css`   | Panel markup + styles                                |
 | `src/main.js`                | Composition root: wires modules, applies settings    |
