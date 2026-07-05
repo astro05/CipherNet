@@ -1,5 +1,6 @@
 **Version:** 2.12.0 | **Last Modified:** 2026-07-05
 
+![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)
 
 Decrypts CipherNet API **request payloads**, **encrypted query strings**, and
