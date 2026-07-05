@@ -1,11 +1,13 @@
-// ui/jsonTable.js — render tabular JSON as a sortable + per-column-filterable
-// table (a lightweight data grid). Returns null when the text isn't tabular JSON
-// so callers can fall back to a text/pre view.
+// ui/jsonTable.js — render any parsed JSON value as a sortable + per-column-
+// filterable table (a lightweight data grid). Returns null only when the text
+// isn't valid JSON at all, so callers can fall back to a text/pre view.
 //
 // Shapes handled:
 //   [ {..}, {..} ]  -> columns = union of keys, one row per object
 //   [ 1, 2, 3 ]     -> a single "Value" column
 //   { a: 1, b: 2 }  -> a two-column Key / Value table
+//   [] / {}         -> an empty table (0 rows)
+//   "x" / 1 / true  -> a single "Value" column, one row
 
 import { el } from "../core/dom.js";
 
@@ -15,10 +17,11 @@ function cellText(v) {
   return String(v);
 }
 
-// Normalise parsed JSON into { columns, rows } or null when not tabular.
+// Normalise any parsed JSON value into { columns, rows }. Always succeeds so
+// the Preview table is available for every JSON shape, not just "tabular" ones.
 function toTable(value) {
   if (Array.isArray(value)) {
-    if (!value.length) return null;
+    if (!value.length) return { columns: ["Value"], rows: [] };
     if (value.every((v) => v !== null && typeof v === "object" && !Array.isArray(v))) {
       const cols = [];
       const seen = new Set();
@@ -28,10 +31,9 @@ function toTable(value) {
     return { columns: ["Value"], rows: value.map((v) => [cellText(v)]) };
   }
   if (value !== null && typeof value === "object") {
-    const rows = Object.entries(value).map(([k, v]) => [k, cellText(v)]);
-    return rows.length ? { columns: ["Key", "Value"], rows } : null;
+    return { columns: ["Key", "Value"], rows: Object.entries(value).map(([k, v]) => [k, cellText(v)]) };
   }
-  return null;
+  return { columns: ["Value"], rows: [[cellText(value)]] };
 }
 
 // Numeric-aware comparison for sorting cell strings.
@@ -99,14 +101,15 @@ function buildTable(columns, rows) {
   return wrap;
 }
 
-// Parse `text` as JSON and return a table element, or null if it isn't tabular.
+// Parse `text` as JSON and return a table element for any JSON shape, or null
+// if `text` isn't valid JSON at all.
 export function jsonTableView(text) {
   let data;
   try {
     const t = String(text).trim();
-    if (!t || (t[0] !== "{" && t[0] !== "[")) return null;
+    if (!t) return null;
     data = JSON.parse(t);
   } catch { return null; }
   const table = toTable(data);
-  return table ? buildTable(table.columns, table.rows) : null;
+  return buildTable(table.columns, table.rows);
 }

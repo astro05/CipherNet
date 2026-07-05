@@ -1,4 +1,4 @@
-**Version:** 2.12.1 | **Last Modified:** 2026-07-05
+**Version:** 2.12.3 | **Last Modified:** 2026-07-05
 
 # Features
 
@@ -51,6 +51,7 @@
 - **Send Decrypt button** — fire the request as-is (GET when no body, POST/JSON when body present)
 - **Send Encrypt button** — encrypt query string and body, then fire the request
 - **Unencrypted response passthrough** — when a sent request's response can't be decrypted, it's shown as plain raw output (not flagged as a decrypt error), since that's the expected result for a plaintext response
+- **Preview on unencrypted responses** — the Preview table is available even when the response wasn't encrypted, as long as the raw body itself is valid JSON
 
 ## Filtering
 - **Custom filter mini-language** — search by method, status, domain, host, scheme, mime-type, protocol, size, headers, running state, cache status, encryption state, API name
@@ -126,7 +127,7 @@
 - **Collapsible JSON tree** — expand/collapse nested objects and arrays
 - **Filterable columns** — per-column filter box to search/hide rows
 - **Inline images** — render image URLs as thumbnails in Preview
-- **Sortable JSON table** — when response is tabular (array of objects, object, or array)
+- **Sortable JSON table** — Preview button available for any valid JSON body (array of objects, plain object, array, or scalar), not just tabular shapes
 - **View raw toggle** — switch between pretty-printed decrypted and raw (Base64 or plaintext)
 
 ## Layout and Resizing

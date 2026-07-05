@@ -205,9 +205,11 @@ export function bodyView(decrypted, raw, res) {
   const toggle = el("button", "linkbtn");
   bar.appendChild(toggle);
 
-  // Preview: when the decrypted body is tabular JSON, offer a sortable /
-  // filterable table view beside the raw/decrypted toggle.
-  const tableNode = decrypted != null ? jsonTableView(decrypted) : null;
+  // Preview: offer a sortable / filterable table view beside the raw/decrypted
+  // toggle whenever there's JSON to show it for. Falls back to the raw text
+  // when there's no decrypted text (e.g. a response that was never encrypted
+  // in the first place) so Preview is available in that case too.
+  const tableNode = jsonTableView(decrypted != null ? decrypted : raw);
   let preview = null;
   if (tableNode) {
     preview = el("button", "linkbtn", "Preview");
