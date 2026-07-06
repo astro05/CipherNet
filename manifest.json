@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "CipherNet",
-  "version": "2.12.5",
-  "description": "Decrypts CipherNet API request payloads.",
-  "minimum_chrome_version": "88",
+  "version": "2.13.0",
+  "description": "Encrypts and Decrypts CipherNet API request payloads. © joyultimates@gmail.com",
+  "minimum_chrome_version": "116",
   "devtools_page": "devtools.html",
-  "permissions": ["storage", "declarativeNetRequestWithHostAccess"],
+  "background": { "service_worker": "background.js" },
+  "permissions": ["storage", "declarativeNetRequestWithHostAccess", "webRequest"],
   "host_permissions": ["<all_urls>"],
   "icons": {
     "16": "assets/icon16.png",

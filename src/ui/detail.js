@@ -91,7 +91,12 @@ async function renderHeaders(entry, seq) {
   const methodV = el("div", "v", entry.method);
   grid.append(methodK, methodV);
   grid.appendChild(el("div", "k", "Status Code"));
-  grid.appendChild(el("div", "v", `${entry.status} ${entry.statusText}`.trim()));
+  const statusLabel = entry.failed
+    ? `(failed) ${entry.statusText}`.trim()
+    : entry.pending && !entry.status
+      ? "(pending)"
+      : `${entry.status} ${entry.statusText}`.trim();
+  grid.appendChild(el("div", "v", statusLabel));
   grid.appendChild(el("div", "k", "Remote Address"));
   grid.appendChild(el("div", "v", entry.serverIP || "—"));
 
@@ -381,6 +386,12 @@ async function renderPreview(entry, seq) {
 
 /* ------------------------------- timing ------------------------------- */
 function renderTiming(entry) {
+  if (!entry.har) {
+    const { s } = section("Timing");
+    els.detailContent.appendChild(s);
+    s.appendChild(el("div", "muted-block", "Request is still pending — timing appears once it finishes."));
+    return;
+  }
   const t = entry.har.timings || {};
   const num = (x) => (typeof x === "number" && x >= 0 ? x : -1);
   const v = {
@@ -444,12 +455,12 @@ function parseCookiePairs(str) {
 }
 export function cookiesOf(entry, which) {
   if (which === "request") {
-    const har = entry.har.request.cookies;
+    const har = entry.har && entry.har.request.cookies;
     if (har && har.length) return har;
     const h = entry.reqHeaders.find((x) => /^cookie$/i.test(x.name));
     return h ? parseCookiePairs(h.value) : [];
   }
-  const har = entry.har.response.cookies;
+  const har = entry.har && entry.har.response.cookies;
   if (har && har.length) return har;
   return entry.respHeaders
     .filter((x) => /^set-cookie$/i.test(x.name))
@@ -499,11 +510,19 @@ function renderCookies(entry) {
 
 /* ------------------------------ initiator ----------------------------- */
 function renderInitiator(entry) {
-  const init = entry.har._initiator;
+  const init = entry.har && entry.har._initiator;
   const { s } = section("Initiator");
   els.detailContent.appendChild(s);
   if (!init) {
-    s.appendChild(el("div", "muted-block", "Initiator information not available for this request."));
+    if (entry.initiator) {
+      // Pending rows only know the initiating origin (from webRequest).
+      const grid = el("div", "kv");
+      grid.appendChild(el("div", "k", "Origin"));
+      grid.appendChild(el("div", "v code", entry.initiator));
+      s.appendChild(grid);
+    } else {
+      s.appendChild(el("div", "muted-block", "Initiator information not available for this request."));
+    }
     return;
   }
   const grid = el("div", "kv");

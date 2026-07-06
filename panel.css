@@ -586,7 +586,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; -webkit-
 tr.selected .method-cell { color: inherit; }
 .status-ok { color: var(--ok); }
 .status-bad { color: var(--err); }
-tr.selected .status-ok, tr.selected .status-bad { color: inherit; }
+.status-pending { color: var(--muted); }
+tr.selected .status-ok, tr.selected .status-bad, tr.selected .status-pending { color: inherit; }
 
 .empty { color: var(--muted); text-align: center; padding: 30px 16px; }
 

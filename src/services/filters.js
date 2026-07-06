@@ -68,7 +68,7 @@ function matchTerm(entry, term) {
     case "scheme":
       return (schemeOf(entry.url) || "").toLowerCase() === v;
     case "protocol":
-      return (entry.har.response.httpVersion || "").toLowerCase().includes(v);
+      return !!entry.har && (entry.har.response.httpVersion || "").toLowerCase().includes(v);
     case "mime-type":
     case "mimetype":
       return (entry.mime || "").toLowerCase().includes(v);
@@ -85,7 +85,7 @@ function matchTerm(entry, term) {
     case "has-request-header":
       return term.value ? headerNames(entry.reqHeaders).includes(v) : entry.reqHeaders.length > 0;
     case "is":
-      if (v === "running") return !entry.status; // 0 / pending
+      if (v === "running") return !!entry.pending && !entry.failed; // still in flight
       if (v === "from-cache") return isFromCache(entry);
       return false;
     case "encrypted":
@@ -112,6 +112,7 @@ function matchesFilter(entry) {
 }
 
 function isFromCache(entry) {
+  if (!entry.har) return false; // still pending
   if (entry.har._fromCache) return true; // Chrome marks cached entries ("memory"/"disk")
   const ts = entry.har.response && entry.har.response._transferSize;
   return ts === 0 && entry.status > 0;
@@ -157,9 +158,23 @@ const RESOURCE_TYPE_TO_PILL = {
   websocket: "socket",
   wasm: "wasm",
 };
+// webRequest's `type` values -> the devtools _resourceType vocabulary, so
+// pending rows sort into the same pills/labels their finished form will use.
+const WEBREQUEST_TYPE = {
+  xmlhttprequest: "xhr",
+  main_frame: "document",
+  sub_frame: "document",
+  stylesheet: "stylesheet",
+  script: "script",
+  image: "image",
+  font: "font",
+  media: "media",
+  websocket: "websocket",
+};
 function resourceTypeOf(entry) {
   const rt = ((entry.har && entry.har._resourceType) || "").toLowerCase();
   if (rt) return rt;
+  if (entry.resourceType) return WEBREQUEST_TYPE[entry.resourceType] || "other";
   // Fallback from MIME when Chrome didn't tag the resource type.
   const t = typeOf(entry.mime);
   if (t === "document") return "document";
@@ -207,12 +222,14 @@ function isThirdParty(entry) {
   return !!h && registrableHost(h) !== registrableHost(state.pageHost);
 }
 function isBlockedRequest(entry) {
+  if (entry.failed) return true; // webRequest reported a net error
+  if (!entry.har) return false;  // still in flight — not blocked (yet)
   if (entry.status === 0) return true; // failed / blocked (incl. our Offline rule)
   const r = entry.har.response;
   return !!(r && (r._error || r.status === 0));
 }
 function hasBlockedResponseCookies(entry) {
-  const r = entry.har.response;
+  const r = entry.har && entry.har.response;
   const list = r && (r._blockedResponseCookies || r._blockedCookies);
   return Array.isArray(list) && list.length > 0;
 }

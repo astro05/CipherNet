@@ -1,4 +1,4 @@
-**Version:** 2.12.5 | **Last Modified:** 2026-07-06
+**Version:** 2.13.0 | **Last Modified:** 2026-07-06
 
 # Features
 
@@ -72,6 +72,7 @@
 - **Capture toggle** — Record button to start/stop capturing requests (red = recording)
 - **Clear list** — 🗑 button to wipe all captured requests
 - **Decryption pipeline** — automatic decryption of requests/responses when key is present
+- **Live (pending) requests** — in-flight requests appear immediately with a grey `(pending)` status and `Pending` time, exactly like Chrome's Network panel, then update in place when they finish; network errors show `(failed)` with the `net::ERR_…` reason as a tooltip (powered by a background service worker relaying `webRequest` events for the inspected tab; `is:running` filters to them)
 - **Preserve log** — keep requests across page reloads/navigations instead of clearing
 
 ## Network Controls

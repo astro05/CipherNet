@@ -36,7 +36,7 @@ function exportHar() {
     log: {
       version: "1.2",
       creator: { name: "CipherNet", version: "1.0.0" },
-      entries: exportList().map((e) => e.har),
+      entries: exportList().map((e) => e.har).filter(Boolean), // pending rows have no HAR yet
     },
   };
   download(tsName("har"), JSON.stringify(har, null, 2), "application/json");

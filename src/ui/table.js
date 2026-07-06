@@ -7,6 +7,7 @@ import { el, debounce } from "../core/dom.js";
 import { nameOf, fmtSize, fmtTime } from "../core/format.js";
 import { typeLabel, rowHidden } from "../services/filters.js";
 import { saveSettings } from "../services/storage.js";
+import { clearPendingIndex } from "../services/capture.js";
 import { renderDetail } from "./detail.js";
 
 /* -------------------------------- list -------------------------------- */
@@ -19,7 +20,7 @@ const COLUMN_DEFS = [
   { id: "type", label: "Type", width: 90, visible: true, text: (e) => typeLabel(e) },
   { id: "initiator", label: "Initiator", width: 150, visible: false, text: initiatorText },
   { id: "size", label: "Size", width: 80, visible: true, text: (e) => fmtSize(e.size) },
-  { id: "time", label: "Time", width: 80, visible: true, text: (e) => fmtTime(e.time) },
+  { id: "time", label: "Time", width: 80, visible: true, text: (e) => (e.pending && !e.failed ? "Pending" : fmtTime(e.time)) },
   { id: "encryption", label: "Encryption", width: 90, visible: false, text: (e) => (e.maybeEncrypted ? "encrypted" : "") },
   { id: "decryption", label: "Decryption", width: 100, visible: false, text: (e) => (e.decrypted ? "decrypted ✓" : e.maybeEncrypted ? "—" : "") },
 ];
@@ -51,8 +52,8 @@ function visibleColumns() {
 const persistColumns = debounce(() => saveSettings({ columns: state.columns }), 250);
 
 function initiatorText(e) {
-  const i = e.har._initiator;
-  if (!i) return "";
+  const i = e.har && e.har._initiator;
+  if (!i) return e.initiator || ""; // pending rows only know the origin
   if (i.url) { try { return new URL(i.url).pathname.split("/").pop() || i.url; } catch { return i.url; } }
   return i.type || "";
 }
@@ -69,9 +70,22 @@ function methodCell(entry, td) {
   td.className += " method-cell " + entry.method;
   td.textContent = entry.method;
 }
+// Chrome-style status column: "(pending)" while in flight, "(failed)" on a net
+// error (tooltip shows net::ERR_…), otherwise the status code.
 function statusCell(entry, td) {
-  td.className += " " + (entry.status >= 400 || entry.status === 0 ? "status-bad" : "status-ok");
-  td.textContent = entry.status || "(pending)";
+  if (entry.failed) {
+    td.className += " status-bad";
+    td.textContent = entry.statusText === "net::ERR_ABORTED" ? "(canceled)" : "(failed)";
+    if (entry.statusText) td.title = entry.statusText;
+    return;
+  }
+  if (!entry.status) {
+    td.className += entry.pending ? " status-pending" : " status-bad";
+    td.textContent = entry.pending ? "(pending)" : "(failed)";
+    return;
+  }
+  td.className += " " + (entry.status >= 400 ? "status-bad" : "status-ok");
+  td.textContent = entry.status;
 }
 
 /* --- table head + colgroup --- */
@@ -132,9 +146,8 @@ function positionColResizers() {
 }
 
 /* --- rows --- */
-function makeRow(entry) {
-  const tr = document.createElement("tr");
-  tr.dataset.id = String(entry.id);
+function fillRow(entry, tr) {
+  tr.innerHTML = "";
   for (const col of visibleColumns()) {
     const td = document.createElement("td");
     td.className = "col-" + col.id;
@@ -142,10 +155,23 @@ function makeRow(entry) {
     else td.textContent = col.text(entry) || "";
     tr.appendChild(td);
   }
+}
+function makeRow(entry) {
+  const tr = document.createElement("tr");
+  tr.dataset.id = String(entry.id);
+  fillRow(entry, tr);
   tr.addEventListener("click", () => selectEntry(entry.id));
   if (entry.id === state.selectedId) tr.classList.add("selected");
   entry.row = tr;
   return tr;
+}
+// Re-render an existing row in place (a pending row finished or failed) and
+// re-evaluate its visibility — status/type/size just went from placeholders
+// to real values, which can change what the active filters match.
+export function refreshRow(entry) {
+  if (!entry.row) return;
+  fillRow(entry, entry.row);
+  entry.row.style.display = rowHidden(entry) ? "none" : "";
 }
 // Auto-scroll: always follow the newest request. Scrolls the most recent
 // visible row into view whenever one arrives (and after sort reorders move it).
@@ -417,6 +443,7 @@ export function updateCount() {
 export function clearRequests() {
   state.entries = [];
   state.byId.clear();
+  clearPendingIndex();
   els.reqBody.innerHTML = "";
   state.search.ids = [];
   state.search.matchIds = null;
