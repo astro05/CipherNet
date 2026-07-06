@@ -147,10 +147,22 @@ function makeRow(entry) {
   entry.row = tr;
   return tr;
 }
+// Auto-scroll: always follow the newest request. Scrolls the most recent
+// visible row into view whenever one arrives (and after sort reorders move it).
+export function scrollToLatest() {
+  for (let i = state.entries.length - 1; i >= 0; i--) {
+    const row = state.entries[i].row;
+    if (row && row.style.display !== "none") {
+      row.scrollIntoView({ block: "nearest", inline: "nearest" });
+      return;
+    }
+  }
+}
 export function addRow(entry) {
   const tr = makeRow(entry);
   els.reqBody.appendChild(tr);
   if (rowHidden(entry)) tr.style.display = "none";
+  else scrollToLatest();
 }
 function rebuildBody() {
   els.reqBody.innerHTML = "";
@@ -198,6 +210,7 @@ function applySort() {
   const frag = document.createDocumentFragment();
   for (const e of sortedEntries()) if (e.row) frag.appendChild(e.row);
   els.reqBody.appendChild(frag);
+  scrollToLatest(); // keep following the newest request after it moves
 }
 export const applySortDebounced = debounce(applySort, 120);
 function toggleSort(colId) {

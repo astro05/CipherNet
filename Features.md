@@ -1,4 +1,4 @@
-**Version:** 2.12.3 | **Last Modified:** 2026-07-05
+**Version:** 2.12.5 | **Last Modified:** 2026-07-06
 
 # Features
 
@@ -81,6 +81,7 @@
 - **Throttling persistence** — selected preset persists via `chrome.storage`
 
 ## Request List
+- **Auto-scroll to latest** — the list always follows the newest incoming request, scrolling it into view as it arrives (also while a column sort is active; filtered-out requests are skipped)
 - **Column headers** — Name, Method, Status, Type, Size, Time (plus optional Initiator, Encryption, Decryption)
 - **Click to detail** — open a request in the detail pane
 - **Column resizing** — drag any column border at any height to resize
