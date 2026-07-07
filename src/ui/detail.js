@@ -5,7 +5,7 @@ import { state } from "../core/state.js";
 import { els } from "../core/els.js";
 import { el, copyBtn } from "../core/dom.js";
 import { CipherNetCrypto } from "../core/crypto.js";
-import { formatBody, escapeHtml, safeDecode, fmtTime } from "../core/format.js";
+import { formatBody, prettyText, escapeHtml, safeDecode, fmtTime } from "../core/format.js";
 import { fetchContent } from "../services/capture.js";
 import { maybeHighlight } from "../services/search.js";
 import { jsonTableView } from "./jsonTable.js";
@@ -266,7 +266,7 @@ export function bodyView(decrypted, raw, res) {
   if (preview) preview.addEventListener("click", () => { showTable = !showTable; render(); });
   copy.addEventListener("click", () => {
     const text = showingRaw || decrypted == null ? raw || "" : decrypted;
-    navigator.clipboard.writeText(text).then(() => {
+    navigator.clipboard.writeText(prettyText(text)).then(() => {
       copy.textContent = "Copied!";
       setTimeout(() => (copy.textContent = "Copy"), 1200);
     });

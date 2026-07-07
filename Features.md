@@ -1,4 +1,4 @@
-**Version:** 2.13.0 | **Last Modified:** 2026-07-06
+**Version:** 2.13.1 | **Last Modified:** 2026-07-07
 
 # Features
 
@@ -39,7 +39,7 @@
 - **Initiator** — initiator type, URL, and JS call stack (when available)
 - **Payload** — decrypted Query String Parameters (table) and decrypted Request Payload, each with View raw / View decrypted toggle and Copy
 - **Preview** — collapsible JSON tree of decrypted response with Expand all / Collapse all; inline image rendering
-- **Response** — decrypted response body, pretty-printed JSON
+- **Response** — decrypted response body, pretty-printed JSON; Copy copies the pretty-printed text (matching what's shown), not the raw minified string
 - **Timing** — DNS / Connect / SSL / Send / Waiting (TTFB) / Download with proportional breakdown bars
 
 ## Encrypt URL Tool

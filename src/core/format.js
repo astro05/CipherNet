@@ -46,13 +46,20 @@ export function looksEncrypted(s) {
 export function escapeHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-export function formatBody(text) {
-  let pretty = text, isJson = false;
+function tryPrettyJson(text) {
   const t = text.trim();
-  if (t && (t[0] === "{" || t[0] === "[")) {
-    try { pretty = JSON.stringify(JSON.parse(t), null, 2); isJson = true; } catch {}
-  }
-  const esc = escapeHtml(pretty);
+  if (!t || (t[0] !== "{" && t[0] !== "[")) return null;
+  try { return JSON.stringify(JSON.parse(t), null, 2); } catch { return null; }
+}
+// Pretty-print JSON text with 2-space indentation (matching the Response tab's
+// display); returns the text unchanged when it isn't parseable JSON.
+export function prettyText(text) {
+  return tryPrettyJson(text) ?? text;
+}
+export function formatBody(text) {
+  const json = tryPrettyJson(text);
+  const isJson = json != null;
+  const esc = escapeHtml(isJson ? json : text);
   if (!isJson) return esc;
   return esc.replace(
     /("(?:\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(?:true|false)\b|\bnull\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
