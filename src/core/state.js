@@ -4,6 +4,7 @@
 export const DEFAULT_KEY = "";
 export const DEFAULT_IV = "";
 export const DEFAULT_LIST_WIDTH = 320;
+export const DEFAULT_KV_KEY_WIDTH = 180; // detail-pane kv label column width (Headers, Payload, Initiator)
 
 export const state = {
   key: DEFAULT_KEY,
@@ -31,7 +32,7 @@ export const state = {
     opts: { regex: false, caseSensitive: false, wholeWord: false },
   },
   // §26 layout (persisted): list-pane width + per-column order/widths/visibility.
-  layout: { listWidth: 0 },
+  layout: { listWidth: 0, kvKeyWidth: 0 },
   columns: { order: [], widths: {}, visible: {} },
   sort: { col: null, dir: 0 }, // dir: 1 asc, -1 desc, 0 none (capture order)
   // §27 network controls (persisted).

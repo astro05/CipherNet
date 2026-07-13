@@ -1,13 +1,14 @@
 // ui/detail.js — the request detail pane: the Headers / Payload / Preview /
 // Response / Timing / Cookies / Initiator tabs, with CipherNet bodies decrypted in place.
 
-import { state } from "../core/state.js";
+import { state, DEFAULT_KV_KEY_WIDTH } from "../core/state.js";
 import { els } from "../core/els.js";
 import { el, copyBtn } from "../core/dom.js";
 import { CipherNetCrypto } from "../core/crypto.js";
 import { formatBody, prettyText, escapeHtml, safeDecode, fmtTime } from "../core/format.js";
 import { fetchContent } from "../services/capture.js";
 import { maybeHighlight } from "../services/search.js";
+import { saveSettings } from "../services/storage.js";
 import { jsonTableView } from "./jsonTable.js";
 
 let renderSeq = 0;
@@ -23,15 +24,59 @@ const TAB_RENDERERS = {
   cookies: renderCookies,
   initiator: renderInitiator,
 };
+// Tabs that render a `.kv` label/value grid — only these show the kv splitter.
+const KV_TABS = new Set(["headers", "payload", "initiator"]);
 export function renderDetail() {
   const entry = state.byId.get(state.selectedId);
   if (!entry) return;
   const seq = ++renderSeq;
   els.detailContent.innerHTML = "";
+  els.kvSplitter.hidden = !KV_TABS.has(state.activeTab);
   const fn = TAB_RENDERERS[state.activeTab] || renderHeaders;
   // fn may be sync or async; highlight once its (awaited) body has run.
   Promise.resolve(fn(entry, seq)).then(() => { if (!stale(seq)) maybeHighlight(); });
 }
+
+/* --- draggable kv label-column width (Request URL row and other kv grids) --- */
+const KV_MIN = 80, KV_MAX = 480;
+const KV_PAD_LEFT = 12; // #detailContent's left padding (panel.css)
+const KV_GAP = 12;      // .kv column gap (panel.css)
+function currentKvWidth() {
+  return state.layout.kvKeyWidth || DEFAULT_KV_KEY_WIDTH;
+}
+function positionKvSplitter() {
+  els.kvSplitter.style.left = KV_PAD_LEFT + currentKvWidth() + KV_GAP / 2 + "px";
+}
+export function applyKvKeyWidth() {
+  document.documentElement.style.setProperty("--kv-key-w", currentKvWidth() + "px");
+  positionKvSplitter();
+}
+function setKvKeyWidth(w) {
+  state.layout.kvKeyWidth = Math.max(KV_MIN, Math.min(KV_MAX, w));
+  applyKvKeyWidth();
+}
+let kvDrag = null;
+els.kvSplitter.addEventListener("mousedown", (e) => {
+  e.preventDefault();
+  kvDrag = { startX: e.clientX, startW: currentKvWidth() };
+  els.kvSplitter.classList.add("dragging");
+  document.body.classList.add("col-resizing");
+});
+els.kvSplitter.addEventListener("dblclick", () => {
+  setKvKeyWidth(DEFAULT_KV_KEY_WIDTH);
+  saveSettings({ layout: state.layout });
+});
+document.addEventListener("mousemove", (e) => {
+  if (!kvDrag) return;
+  setKvKeyWidth(kvDrag.startW + (e.clientX - kvDrag.startX));
+});
+document.addEventListener("mouseup", () => {
+  if (!kvDrag) return;
+  kvDrag = null;
+  els.kvSplitter.classList.remove("dragging");
+  document.body.classList.remove("col-resizing");
+  saveSettings({ layout: state.layout });
+});
 
 // A grid value cell that shows `text` plus a copy button.
 function valueWithCopy(text) {

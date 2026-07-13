@@ -624,7 +624,28 @@ tr.selected .status-ok, tr.selected .status-bad, tr.selected .status-pending { c
 }
 .close:hover { color: var(--fg); }
 
+#detailBody { flex: 1 1 auto; display: flex; min-height: 0; position: relative; }
 #detailContent { flex: 1 1 auto; overflow: auto; padding: 10px 12px; }
+
+/* Draggable divider between the kv label column and the value column (e.g. the
+   Request URL row in Headers) — lets the URL/value area grow or shrink. */
+#kvSplitter {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 9px;
+  margin-left: -4px;
+  cursor: col-resize;
+  z-index: 3;
+}
+#kvSplitter[hidden] { display: none; }
+#kvSplitter::after {
+  content: "";
+  position: absolute;
+  left: 4px; top: 0; bottom: 0;
+  width: 1px;
+  background: transparent;
+}
+#kvSplitter:hover::after, #kvSplitter.dragging::after { background: var(--accent); width: 2px; }
 
 /* sections inside detail */
 .dsection { margin-bottom: 16px; }
@@ -640,8 +661,8 @@ tr.selected .status-ok, tr.selected .status-bad, tr.selected .status-pending { c
 }
 .dsection-title .sub { color: var(--muted); font-weight: 400; font-size: 11px; }
 
-.kv { display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 2px 12px; }
-.kv .k { color: var(--muted); white-space: nowrap; }
+.kv { display: grid; grid-template-columns: var(--kv-key-w, minmax(120px, 220px)) 1fr; gap: 2px 12px; }
+.kv .k { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kv .v {
   color: var(--fg);
   word-break: break-all;

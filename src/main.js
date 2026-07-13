@@ -4,7 +4,7 @@
 
 import "./ui/theme.js"; // first, to set the theme before the panel paints
 
-import { state, DEFAULT_KEY, DEFAULT_IV, DEFAULT_LIST_WIDTH } from "./core/state.js";
+import { state, DEFAULT_KEY, DEFAULT_IV, DEFAULT_LIST_WIDTH, DEFAULT_KV_KEY_WIDTH } from "./core/state.js";
 import { els } from "./core/els.js";
 import { loadSettings } from "./services/storage.js";
 import {
@@ -21,7 +21,7 @@ import {
 import "./services/capture.js";
 import "./services/search.js";
 import "./services/exporter.js";
-import "./ui/detail.js";
+import { applyKvKeyWidth } from "./ui/detail.js";
 import "./ui/views.js";
 import { refreshKeyIndicator } from "./ui/keyBox.js";
 import "./ui/encryptTool.js";
@@ -41,8 +41,10 @@ function applySettings(saved) {
   // §26 layout
   state.columns = normalizeColumns(saved.columns);
   state.layout = saved.layout && saved.layout.listWidth ? saved.layout : { listWidth: DEFAULT_LIST_WIDTH };
+  if (!state.layout.kvKeyWidth) state.layout.kvKeyWidth = DEFAULT_KV_KEY_WIDTH;
   if (saved.sort && COLUMN_MAP[saved.sort.col]) state.sort = saved.sort;
   rebuildTable();
+  applyKvKeyWidth();
 
   // §27 network controls
   state.preserveLog = !!saved.preserveLog;

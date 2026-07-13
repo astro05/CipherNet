@@ -56,7 +56,9 @@ export const els = {
   decOutput: document.getElementById("decOutput"),
   detailPane: document.getElementById("detailPane"),
   detailTabs: document.getElementById("detailTabs"),
+  detailBody: document.getElementById("detailBody"),
   detailContent: document.getElementById("detailContent"),
+  kvSplitter: document.getElementById("kvSplitter"),
   closeDetail: document.getElementById("closeDetail"),
   // search
   searchToggle: document.getElementById("searchToggle"),

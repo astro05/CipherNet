@@ -1,4 +1,4 @@
-**Version:** 2.13.1 | **Last Modified:** 2026-07-07
+**Version:** 2.13.2 | **Last Modified:** 2026-07-13
 
 # Features
 
@@ -58,6 +58,7 @@
 - **Encrypted only toggle** — quickly filter to encrypted requests only
 - **More filters dropdown** — Hide data URLs, Hide extension URLs, Blocked requests, 3rd-party requests, Blocked response cookies
 - **Resource-type pills** — All · Fetch/XHR · Doc · CSS · JS · Font · Img · Media · Manifest · Socket · Wasm · Other (single or multi-select via Ctrl/Cmd-click)
+- **Filter persistence** — resource-type pill selection and More filters toggles persist via `chrome.storage` and are restored the next time DevTools opens
 
 ## Key Management
 - **Clear key** — wipe stored key and restart red blink indicator
@@ -136,3 +137,4 @@
 - **Horizontal splitter** — drag between request list and detail pane to resize
 - **Reset splitter** — double-click the splitter to restore default width
 - **Splitter persistence** — width persists via `chrome.storage`
+- **kv column splitter** — drag the divider in Headers/Payload/Initiator to resize the label column, growing or shrinking the value column (e.g. the Request URL row); double-click to reset; persists via `chrome.storage`
