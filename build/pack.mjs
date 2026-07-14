@@ -5,9 +5,13 @@
 //
 //   - dist/            must exist first (run `npm run build`); `npm run pack`
 //                      rebuilds it for you.
-//   - key.pem          the private signing key. Generated on first run and
-//                      REUSED afterwards so the extension ID stays stable.
-//                      Keep it secret — anyone with it can publish updates that
+//   - key.pem          the private signing key, kept OUTSIDE this repo (in
+//                      ../ciphernet-key/) so it never sits inside the folder
+//                      you "Load unpacked" in Chrome — Chrome warns/refuses on
+//                      unpacked extensions that contain a .pem file alongside
+//                      the manifest. Generated on first run and REUSED
+//                      afterwards so the extension ID stays stable. Keep it
+//                      secret — anyone with it can publish updates that
 //                      Chrome treats as the same extension.
 //   - CipherNet.crx   the packaged extension (drag onto chrome://extensions).
 //   - CipherNet.zip   plain zip of dist/ — this is what the Chrome Web Store
@@ -24,7 +28,7 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const DIST = join(ROOT, "dist");
 const MANIFEST = join(DIST, "manifest.json");
 
-const keyPath = join(ROOT, "key.pem");
+const keyPath = join(ROOT, "..", "ciphernet-key", "key.pem");
 const crxPath = join(ROOT, "CipherNet.crx");
 const zipPath = join(ROOT, "CipherNet.zip");
 

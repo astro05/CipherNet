@@ -318,15 +318,18 @@ Outputs (in the project root):
 | ----------------- | ----------------------------------------------------------- |
 | `CipherNet.crx`  | Signed **CRX3** package. Drag it onto chrome://extensions.  |
 | `CipherNet.zip`  | Plain zip of `dist/` — upload this to the Chrome Web Store. |
-| `key.pem`         | Private signing key (see warning below).                    |
 
-`key.pem` is generated on the **first** pack and **reused** afterwards, so the
-extension ID stays stable across rebuilds (currently
-`opdendjleoanbhogiodimdjonpbdokno`).
+`key.pem`, the private signing key, lives **outside this repo** in
+`../ciphernet-key/key.pem` — never inside the project folder. Chrome warns
+(and Web Store review rejects) unpacked extensions that contain a `.pem` file
+alongside the manifest, and this repo's root is exactly the folder you'd
+"Load unpacked" for dev, so the key must not sit here. It's generated on the
+**first** pack and **reused** afterwards, so the extension ID stays stable
+across rebuilds (currently `opdendjleoanbhogiodimdjonpbdokno`).
 
 > ⚠️ **Keep `key.pem` secret and backed up.** Anyone who has it can publish
 > updates Chrome treats as this same extension. If you lose it, the extension ID
-> changes. It's git-ignored on purpose.
+> changes.
 
 Install notes:
 
