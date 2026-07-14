@@ -3,7 +3,7 @@
 
 import { state } from "../core/state.js";
 import { els } from "../core/els.js";
-import { el, debounce } from "../core/dom.js";
+import { el } from "../core/dom.js";
 import { hostOf, schemeOf, typeOf, nameOf } from "../core/format.js";
 import { saveSettings } from "./storage.js";
 
@@ -254,10 +254,14 @@ export function rowHidden(entry) {
   );
 }
 
-const persistFilters = debounce(
-  () => saveSettings({ typeFilters: [...state.typeFilters], moreFilters: state.moreFilters }),
-  200
-);
+// Type pills / more-filter toggles are discrete click events, not a rapid
+// stream — save immediately rather than debouncing. A debounced save risks
+// losing the write entirely: if DevTools closes before the timer fires, the
+// pending setTimeout is torn down with the page and chrome.storage.local.set
+// never runs.
+function persistFilters() {
+  saveSettings({ typeFilters: [...state.typeFilters], moreFilters: state.moreFilters });
+}
 export function renderTypePills() {
   els.typeFiltersBar.innerHTML = "";
   for (const tf of TYPE_FILTERS) {

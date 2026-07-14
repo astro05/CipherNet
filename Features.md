@@ -1,4 +1,4 @@
-**Version:** 2.13.2 | **Last Modified:** 2026-07-13
+**Version:** 2.13.4 | **Last Modified:** 2026-07-14
 
 # Features
 
@@ -29,6 +29,7 @@
 - **Decrypted request body** — show the plaintext payload
 - **Decrypted request headers** — show decrypted URL and Bearer token in the Headers tab
 - **Decrypted response body** — show the plaintext response, pretty-printed if JSON
+- **Pretty-printed JSON everywhere** — Response tab, Preview drawer's Body tab, and the 🔓 Decrypt tool all pretty-print + syntax-highlight JSON bodies, whether decrypted or shown raw
 - **Decrypted query string** — show plaintext query parameters in a parsed table
 - **Encryption detection** — flag encrypted requests with 🔒
 - **Web Crypto API** — AES-128-CBC with PKCS7 (mirrors .NET backend)

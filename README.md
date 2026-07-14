@@ -1,4 +1,4 @@
-**Version:** 2.13.2 | **Last Modified:** 2026-07-13
+**Version:** 2.13.4 | **Last Modified:** 2026-07-14
 
 ![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)

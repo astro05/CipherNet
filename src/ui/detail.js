@@ -295,10 +295,10 @@ export function bodyView(decrypted, raw, res) {
         pre.classList.add("error");
         pre.innerHTML =
           `<span class="note">[could not decrypt: ${escapeHtml(res.error)}]\nShowing raw bytes:</span>\n\n` +
-          escapeHtml(raw || "(empty)");
+          formatBody(raw || "(empty)");
       } else {
         pre.classList.remove("error");
-        pre.textContent = raw || "(empty)";
+        pre.innerHTML = formatBody(raw || "(empty)");
       }
     } else {
       pre.classList.remove("error");
@@ -331,7 +331,7 @@ function sourceToggle(raw, decrypted) {
   btn.addEventListener("click", () => {
     open = !open;
     pre.style.display = open ? "" : "none";
-    pre.textContent = decrypted;
+    pre.innerHTML = formatBody(decrypted);
     btn.textContent = open ? "Hide source" : "View decrypted source";
   });
   wrap.appendChild(btn);
