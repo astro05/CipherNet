@@ -7,7 +7,9 @@ import { els } from "../core/els.js";
 import { el, copyBtn } from "../core/dom.js";
 import { CipherNetCrypto } from "../core/crypto.js";
 import { safeDecode, fmtTime, fmtSize, stripQuotes } from "../core/format.js";
-import { getCollections, setCollections } from "../services/storage.js";
+import {
+  getCollections, setCollections, loadHistory, addHistoryEntry, removeHistoryEntry, clearHistory,
+} from "../services/storage.js";
 import { bodyView } from "./detail.js";
 import { showView, currentView } from "./views.js";
 
@@ -56,7 +58,8 @@ let currentSnapshot = null; // { url, body, token } captured at load/save time
 
 getCollections().then(({ collections: c, legacy }) => {
   collections = c || {};
-  // Migrate pre-2.9 flat saves into a "Default" folder the first time.
+  // Migrate pre-2.9 flat saves, and pre-2.14 local-only saves, into synced
+  // folder-based collections the first time.
   if (!c && legacy && Object.keys(legacy).length) {
     collections = { Default: legacy };
     setCollections(collections);
@@ -75,7 +78,11 @@ function checkDirty() {
 }
 [els.encUrl, els.encBody, els.encToken].forEach((elm) => elm.addEventListener("input", checkDirty));
 
-function closePanels() { els.addPanel.hidden = true; els.collectionPanel.hidden = true; }
+function closePanels() {
+  els.addPanel.hidden = true;
+  els.collectionPanel.hidden = true;
+  els.historyPanel.hidden = true;
+}
 // Close the pop-panels when clicking anywhere outside the collection tools.
 document.addEventListener("click", (e) => {
   if (e.target.closest && !e.target.closest("#encTools")) closePanels();
@@ -103,7 +110,7 @@ els.addSaveBtn.addEventListener("click", () => {
   const folder = els.addNewFolder.value.trim() || els.addFolder.value || "Default";
   if (!collections[folder]) collections[folder] = {};
   collections[folder][name] = snapshot();
-  setCollections(collections, () => flashEnc(`Saved “${name}” to “${folder}” ✓`));
+  setCollections(collections, (err) => flashEnc(err ? `Save failed: ${err}` : `Saved “${name}” to “${folder}” ✓`, !!err));
   currentRef = { folder, name };
   currentSnapshot = snapshot();
   els.addPanel.hidden = true;
@@ -115,7 +122,7 @@ els.saveReqBtn.addEventListener("click", () => {
   if (!currentRef) return;
   if (!collections[currentRef.folder]) collections[currentRef.folder] = {};
   collections[currentRef.folder][currentRef.name] = snapshot();
-  setCollections(collections, () => flashEnc(`Updated “${currentRef.name}” ✓`));
+  setCollections(collections, (err) => flashEnc(err ? `Save failed: ${err}` : `Updated “${currentRef.name}” ✓`, !!err));
   currentSnapshot = snapshot();
   checkDirty();
 });
@@ -165,6 +172,90 @@ function renderCollectionTree() {
     }
   }
 }
+
+/* ---- 🕘 History: an automatic, unnamed log of the last 100 sent requests ---- */
+// Request-only (+ response summary) so it stays comfortably inside the
+// chrome.storage.sync quota — see services/storage.js. Kept in sync with the
+// synced store in `history`, newest first.
+let history = [];
+loadHistory().then((h) => {
+  history = h.slice().reverse(); // storage keeps oldest-first; show newest first
+  if (!els.historyPanel.hidden) renderHistoryPanel();
+});
+
+// Persist one sent request (request + response summary, no response body —
+// see services/storage.js) and mirror it into the in-memory list.
+function saveHistoryEntry(histEntry) {
+  addHistoryEntry(histEntry).then(({ ok, key }) => {
+    if (!ok) return;
+    history.unshift({ ...histEntry, _key: key });
+    if (history.length > 100) history.length = 100;
+    if (!els.historyPanel.hidden) renderHistoryPanel();
+  });
+}
+
+els.historyBtn.addEventListener("click", () => {
+  const willOpen = els.historyPanel.hidden;
+  closePanels();
+  if (!willOpen) return;
+  renderHistoryPanel();
+  els.historyPanel.hidden = false;
+});
+
+function renderHistoryPanel() {
+  const panel = els.historyPanel;
+  panel.innerHTML = "";
+  const actions = el("div", "hist-actions");
+  actions.appendChild(el("span", "muted", `Request History (${history.length}/100)`));
+  const clearBtn = el("button", "linkbtn", "Clear");
+  clearBtn.title = "Clear all request history";
+  clearBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!history.length) return;
+    history = [];
+    clearHistory();
+    renderHistoryPanel();
+  });
+  actions.appendChild(clearBtn);
+  panel.appendChild(actions);
+
+  if (!history.length) {
+    panel.appendChild(el("div", "muted-block", "No requests sent yet — use Send Encrypt / Send Decrypt."));
+    return;
+  }
+  for (const h of history) {
+    const ok = h.status >= 200 && h.status < 400;
+    const row = el("div", "hist-row");
+    row.append(
+      el("span", "rhist-method", h.method),
+      el("span", "rhist-status " + (ok ? "ok" : "bad"), String(h.status || "—")),
+      el("span", "rhist-url", h.url),
+      el("span", "rhist-time", fmtTime(h.timeMs))
+    );
+    const del = el("button", "tree-del", "🗑");
+    del.title = "Remove from history";
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      history = history.filter((x) => x !== h);
+      if (h._key) removeHistoryEntry(h._key);
+      renderHistoryPanel();
+    });
+    row.appendChild(del);
+    row.addEventListener("click", () => {
+      els.encUrl.value = h.url || "";
+      els.encBody.value = h.body || "";
+      els.encToken.value = h.token || "";
+      renderParamsFromUrl();
+      currentRef = null; // loading history doesn't attach it to a saved collection entry
+      currentSnapshot = null;
+      checkDirty();
+      closePanels();
+      flashEnc("Loaded from history");
+    });
+    panel.appendChild(row);
+  }
+}
+
 function renameFolder(folder) {
   const next = (prompt("Rename folder:", folder) || "").trim();
   if (!next || next === folder) return;
@@ -172,7 +263,7 @@ function renameFolder(folder) {
   collections[next] = collections[folder];
   delete collections[folder];
   if (currentRef && currentRef.folder === folder) currentRef.folder = next;
-  setCollections(collections, () => flashEnc(`Renamed folder to “${next}”`));
+  setCollections(collections, (err) => flashEnc(err ? `Rename failed: ${err}` : `Renamed folder to “${next}”`, !!err));
   renderCollectionTree();
 }
 function renameApi(folder, name) {
@@ -184,7 +275,7 @@ function renameApi(folder, name) {
   f[next] = f[name];
   delete f[name];
   if (currentRef && currentRef.folder === folder && currentRef.name === name) currentRef.name = next;
-  setCollections(collections, () => flashEnc(`Renamed to “${next}”`));
+  setCollections(collections, (err) => flashEnc(err ? `Rename failed: ${err}` : `Renamed to “${next}”`, !!err));
   renderCollectionTree();
 }
 function loadApi(folder, name) {
@@ -430,6 +521,11 @@ async function sendRequest(mode) {
       at: new Date(),
     };
     sendHistory.push(entry);
+    saveHistoryEntry({
+      method, mode, url: rawUrl, body: rawBody, token,
+      status: entry.status, statusText: entry.statusText,
+      timeMs: entry.timeMs, size: entry.size, at: entry.at.toISOString(),
+    });
     respTab = "body";
     renderResponseView(entry);
     flashEnc("");

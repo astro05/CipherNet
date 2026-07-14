@@ -1,11 +1,24 @@
-// services/storage.js — the single persistence boundary over chrome.storage.local.
+// services/storage.js — the single persistence boundary over chrome.storage.
+//
+// Device/session UI state (key, layout, columns, filters, …) lives in
+// chrome.storage.local — it's wiped on uninstall, which is fine, it's not
+// meant to survive that.
+//
+// Collections and Request History are meant to survive uninstall/reinstall,
+// so they live in chrome.storage.sync instead — sync data is tied to the
+// signed-in Chrome profile, not the local install, and reappears
+// automatically next time the extension is loaded. The tradeoff is a hard
+// quota: 100 KB total, 8 KB per stored key. History is sharded across one
+// key per entry (plus a small index key) so no single write can approach the
+// per-key cap, and entries are capped at 100 with oldest-first eviction to
+// stay under the total budget.
 
 const KEYS = [
   "key", "iv", "columns", "layout", "sort",
   "preserveLog", "disableCache", "throttle", "typeFilters", "moreFilters",
 ];
 
-// Read all persisted settings at once.
+// Read all persisted (local, device-scoped) settings at once.
 export function loadSettings() {
   return new Promise((resolve) => chrome.storage.local.get(KEYS, resolve));
 }
@@ -15,16 +28,121 @@ export function saveSettings(partial, cb) {
   chrome.storage.local.set(partial, cb);
 }
 
+/* ------------------------------ collections ------------------------------ */
 // Saved Encrypt-URL requests as folder-based collections:
 //   { folderName: { requestName: { url, body, token } } }
+// Stored in chrome.storage.sync so they survive uninstall/reinstall.
+
 // Also returns the pre-2.9 flat `savedRequests` (if any) so callers can migrate.
 export function getCollections() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(["savedCollections"], (syncRes) => {
+      if (syncRes.savedCollections) { resolve({ collections: syncRes.savedCollections, legacy: null }); return; }
+      // Nothing in sync yet — fall back to (and let the caller migrate from)
+      // local storage, where versions before 2.14 kept this data.
+      chrome.storage.local.get(["savedCollections", "savedRequests"], (localRes) => {
+        resolve({ collections: localRes.savedCollections || null, legacy: localRes.savedRequests || null });
+      });
+    });
+  });
+}
+// cb receives an error message on failure (e.g. sync quota exceeded), or
+// null/undefined on success — callers should surface it to the user rather
+// than silently drop the save, since Collections are a deliberate save.
+export function setCollections(map, cb) {
+  chrome.storage.sync.set({ savedCollections: map }, () => {
+    cb && cb(chrome.runtime.lastError ? chrome.runtime.lastError.message : null);
+  });
+}
+
+/* ------------------------------- history -------------------------------- */
+// Request History: an automatic (unnamed) log of the last HIST_MAX_ITEMS
+// Send Encrypt / Send Decrypt requests, so they can be reloaded later. Each
+// entry holds the request (URL/body/token) and a response summary — not the
+// full response body, which would blow the sync quota well before 100
+// entries. Also stored in chrome.storage.sync to survive uninstall.
+const HIST_INDEX_KEY = "historyIndex"; // { next: number, order: string[] } — order is oldest-first
+const HIST_MAX_ITEMS = 100;
+const HIST_FIELD_MAX = 4000;    // per-field char cap, defensive: keeps one entry well under the 8KB/item limit
+const SYNC_SAFETY_BYTES = 92000; // stay under the 100KB total quota, leaving headroom for Collections
+
+function histKey(n) {
+  return "hist_" + n;
+}
+function truncate(s, max) {
+  if (typeof s !== "string" || s.length <= max) return s || "";
+  return s.slice(0, max) + "…(truncated)";
+}
+function getIndex() {
   return new Promise((resolve) =>
-    chrome.storage.local.get(["savedCollections", "savedRequests"], (r) =>
-      resolve({ collections: r.savedCollections || null, legacy: r.savedRequests || null })
-    )
+    chrome.storage.sync.get([HIST_INDEX_KEY], (res) => resolve(res[HIST_INDEX_KEY] || { next: 0, order: [] }))
   );
 }
-export function setCollections(map, cb) {
-  chrome.storage.local.set({ savedCollections: map }, cb);
+function removeKeys(keys) {
+  return keys.length ? new Promise((resolve) => chrome.storage.sync.remove(keys, resolve)) : Promise.resolve();
+}
+function bytesInUse() {
+  return new Promise((resolve) => chrome.storage.sync.getBytesInUse(null, resolve));
+}
+
+// Oldest-first array of history entries (each tagged with its storage `_key`
+// so removeHistoryEntry can target it).
+export async function loadHistory() {
+  const idx = await getIndex();
+  if (!idx.order.length) return [];
+  const entries = await new Promise((resolve) => chrome.storage.sync.get(idx.order, resolve));
+  return idx.order.map((k) => (entries[k] ? { ...entries[k], _key: k } : null)).filter(Boolean);
+}
+
+// Append one entry, evicting the oldest first past the 100-item cap or when
+// approaching the total sync quota. Best-effort: resolves { ok: false } (and
+// drops the entry) rather than throwing, since history is a convenience log,
+// not canonical data — it should never block or error out the actual send.
+// On success, resolves { ok: true, key } so the caller can mirror it
+// in-memory (e.g. for delete) without a round-trip read.
+export async function addHistoryEntry(entry) {
+  const trimmed = {
+    method: entry.method,
+    mode: entry.mode,
+    url: truncate(entry.url, HIST_FIELD_MAX),
+    body: truncate(entry.body, HIST_FIELD_MAX),
+    token: truncate(entry.token, HIST_FIELD_MAX),
+    status: entry.status,
+    statusText: truncate(entry.statusText, 200),
+    timeMs: entry.timeMs,
+    size: entry.size,
+    at: entry.at,
+  };
+
+  const idx = await getIndex();
+  let order = idx.order.slice();
+
+  while (order.length >= HIST_MAX_ITEMS) await removeKeys([order.shift()]);
+
+  const estBytes = JSON.stringify(trimmed).length + 40; // +overhead for the key name/envelope
+  let used = await bytesInUse();
+  while (used + estBytes > SYNC_SAFETY_BYTES && order.length) {
+    await removeKeys([order.shift()]);
+    used = await bytesInUse();
+  }
+
+  const key = histKey(idx.next);
+  order.push(key);
+  const nextIdx = { next: idx.next + 1, order };
+  const ok = await new Promise((resolve) =>
+    chrome.storage.sync.set({ [key]: trimmed, [HIST_INDEX_KEY]: nextIdx }, () => resolve(!chrome.runtime.lastError))
+  );
+  return ok ? { ok: true, key } : { ok: false, key: null };
+}
+
+export async function removeHistoryEntry(key) {
+  const idx = await getIndex();
+  const order = idx.order.filter((k) => k !== key);
+  await new Promise((resolve) => chrome.storage.sync.set({ [HIST_INDEX_KEY]: { ...idx, order } }, resolve));
+  await removeKeys([key]);
+}
+
+export async function clearHistory() {
+  const idx = await getIndex();
+  await removeKeys([...idx.order, HIST_INDEX_KEY]);
 }

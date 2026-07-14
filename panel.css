@@ -488,6 +488,24 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .rhist-url { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rhist-time { color: var(--muted); flex: 0 0 auto; }
 .rhist-row.active .rhist-time { color: inherit; }
+/* 🕘 Request History panel — flat list, newest first, synced across installs */
+.hist-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; padding: 0 4px; }
+.hist-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  color: var(--fg);
+  font-family: Consolas, monospace;
+  font-size: 11px;
+}
+.hist-row:hover { background: var(--hover); }
 .chk { display: flex; align-items: center; gap: 4px; color: var(--muted); }
 .count { color: var(--muted); margin-left: auto; }
 .muted { color: var(--muted); }

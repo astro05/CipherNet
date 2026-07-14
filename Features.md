@@ -1,4 +1,4 @@
-**Version:** 2.13.4 | **Last Modified:** 2026-07-14
+**Version:** 2.14.0 | **Last Modified:** 2026-07-14
 
 # Features
 
@@ -14,7 +14,7 @@
 - **Reset columns** — restore default layout and visibility
 
 ## Collections (Saved Requests)
-- **Add request** — name a request (API name) and assign it to a folder, then save URL/body/token locally
+- **Add request** — name a request (API name) and assign it to a folder, then save URL/body/token
 - **Collection tree** — dropdown showing all folders and requests in a tree view
 - **Delete folder** — remove a folder and all its requests (with 🗑 button)
 - **Delete request** — remove a single saved request (with 🗑 button)
@@ -22,7 +22,15 @@
 - **Rename folder** — rename a folder (with ✎ button)
 - **Rename request** — rename a saved API request (with ✎ button)
 - **Save button** — update a previously saved request after modifying it
-- **Save request** — persist URLs, payloads, and Bearer tokens locally
+- **Save request** — persist URLs, payloads, and Bearer tokens via `chrome.storage.sync`, so Collections survive uninstalling and reinstalling the extension (requires the browser signed in with Chrome Sync enabled — otherwise sync storage behaves like local storage and won't survive uninstall)
+
+## Request History
+- **🕘 History button** — beside ➕ Add in the Encrypt URL toolbar; opens a dropdown of the last 100 sent requests, newest first
+- **Auto-logged** — every Send Encrypt / Send Decrypt call is logged automatically, no naming needed (unlike Collections)
+- **Load from history** — click an entry to reload its URL/payload/Bearer token back into the composer
+- **Per-entry delete + Clear all** — remove one entry (🗑) or clear the whole log
+- **Survives uninstall** — stored via `chrome.storage.sync` like Collections, same signed-in-profile caveat applies
+- **Compact by design** — stores the request (URL/body/token) and a response summary (status/size/time), not the full response body, to stay well inside chrome.storage.sync's 100 KB/8 KB-per-item quota across 100 entries
 
 ## Decryption
 - **Auto-lenient mode** — when strict decryption fails, automatically retry by trimming to whole 16-byte blocks without PKCS7 validation

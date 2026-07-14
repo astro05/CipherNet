@@ -44,6 +44,8 @@ export const els = {
   addSaveBtn: document.getElementById("addSaveBtn"),
   addCancelBtn: document.getElementById("addCancelBtn"),
   saveReqBtn: document.getElementById("saveReqBtn"),
+  historyBtn: document.getElementById("historyBtn"),
+  historyPanel: document.getElementById("historyPanel"),
   // network / decrypt views (leading toolbar buttons)
   networkBtn: document.getElementById("networkBtn"),
   netControls: document.getElementById("netControls"),
