@@ -10,6 +10,7 @@ import { safeDecode, fmtTime, fmtSize, stripQuotes } from "../core/format.js";
 import {
   getCollections, setCollections, loadHistory, addHistoryEntry, removeHistoryEntry, clearHistory,
 } from "../services/storage.js";
+import * as backup from "../services/backup.js";
 import { bodyView } from "./detail.js";
 import { showView, currentView } from "./views.js";
 
@@ -56,15 +57,13 @@ let collections = {};
 let currentRef = null;      // { folder, name } of the loaded/saved request, or null
 let currentSnapshot = null; // { url, body, token } captured at load/save time
 
-getCollections().then(({ collections: c, legacy }) => {
-  collections = c || {};
-  // Migrate pre-2.9 flat saves, and pre-2.14 local-only saves, into synced
-  // folder-based collections the first time.
-  if (!c && legacy && Object.keys(legacy).length) {
-    collections = { Default: legacy };
-    setCollections(collections);
-  }
-});
+// Write collections to chrome.storage *and* mirror them to the backup file (a
+// no-op when none is linked). Every mutation below goes through here so the file
+// can't drift from the live store.
+function persistCollections(cb) {
+  setCollections(collections, cb);
+  backup.scheduleWrite(collections, history);
+}
 
 function snapshot() {
   return { url: els.encUrl.value, body: els.encBody.value, token: els.encToken.value };
@@ -82,6 +81,7 @@ function closePanels() {
   els.addPanel.hidden = true;
   els.collectionPanel.hidden = true;
   els.historyPanel.hidden = true;
+  els.backupMenu.hidden = true;
 }
 // Close the pop-panels when clicking anywhere outside the collection tools.
 document.addEventListener("click", (e) => {
@@ -110,7 +110,7 @@ els.addSaveBtn.addEventListener("click", () => {
   const folder = els.addNewFolder.value.trim() || els.addFolder.value || "Default";
   if (!collections[folder]) collections[folder] = {};
   collections[folder][name] = snapshot();
-  setCollections(collections, (err) => flashEnc(err ? `Save failed: ${err}` : `Saved “${name}” to “${folder}” ✓`, !!err));
+  persistCollections((err) => flashEnc(err ? `Save failed: ${err}` : `Saved “${name}” to “${folder}” ✓`, !!err));
   currentRef = { folder, name };
   currentSnapshot = snapshot();
   els.addPanel.hidden = true;
@@ -122,7 +122,7 @@ els.saveReqBtn.addEventListener("click", () => {
   if (!currentRef) return;
   if (!collections[currentRef.folder]) collections[currentRef.folder] = {};
   collections[currentRef.folder][currentRef.name] = snapshot();
-  setCollections(collections, (err) => flashEnc(err ? `Save failed: ${err}` : `Updated “${currentRef.name}” ✓`, !!err));
+  persistCollections((err) => flashEnc(err ? `Save failed: ${err}` : `Updated “${currentRef.name}” ✓`, !!err));
   currentSnapshot = snapshot();
   checkDirty();
 });
@@ -178,10 +178,6 @@ function renderCollectionTree() {
 // chrome.storage.sync quota — see services/storage.js. Kept in sync with the
 // synced store in `history`, newest first.
 let history = [];
-loadHistory().then((h) => {
-  history = h.slice().reverse(); // storage keeps oldest-first; show newest first
-  if (!els.historyPanel.hidden) renderHistoryPanel();
-});
 
 // Persist one sent request (request + response summary, no response body —
 // see services/storage.js) and mirror it into the in-memory list.
@@ -190,9 +186,45 @@ function saveHistoryEntry(histEntry) {
     if (!ok) return;
     history.unshift({ ...histEntry, _key: key });
     if (history.length > 100) history.length = 100;
+    backup.scheduleWrite(collections, history);
     if (!els.historyPanel.hidden) renderHistoryPanel();
   });
 }
+
+/* -------------------------- load collections + history -------------------------- */
+// chrome.storage first, then the linked backup file (if any) on top of it —
+// that second step is what brings saved requests back after the extension has
+// been removed and re-added, with no interaction beyond re-linking the file once.
+async function loadStores() {
+  const { collections: c, legacy } = await getCollections();
+  collections = c || {};
+  // Migrate pre-2.9 flat saves, and pre-2.14 local-only saves, into synced
+  // folder-based collections the first time.
+  if (!c && legacy && Object.keys(legacy).length) {
+    collections = { Default: legacy };
+    setCollections(collections);
+  }
+  history = (await loadHistory()).reverse(); // storage keeps oldest-first; show newest first
+
+  const res = await backup.pullOnLoad(collections, history);
+  if (res.pulled) {
+    collections = res.collections;
+    history = res.history;
+  }
+  renderOpenPanels();
+  refreshBackupState();
+}
+function renderOpenPanels() {
+  if (!els.historyPanel.hidden) renderHistoryPanel();
+  if (!els.collectionPanel.hidden) renderCollectionTree();
+}
+loadStores();
+
+// backup.html broadcasts this after linking / restoring / re-authorising a file:
+// chrome.storage has changed underneath us, so re-read it.
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg && msg.type === "backup.linked") loadStores();
+});
 
 els.historyBtn.addEventListener("click", () => {
   const willOpen = els.historyPanel.hidden;
@@ -214,6 +246,7 @@ function renderHistoryPanel() {
     if (!history.length) return;
     history = [];
     clearHistory();
+    backup.scheduleWrite(collections, history);
     renderHistoryPanel();
   });
   actions.appendChild(clearBtn);
@@ -238,6 +271,7 @@ function renderHistoryPanel() {
       e.stopPropagation();
       history = history.filter((x) => x !== h);
       if (h._key) removeHistoryEntry(h._key);
+      backup.scheduleWrite(collections, history);
       renderHistoryPanel();
     });
     row.appendChild(del);
@@ -256,6 +290,92 @@ function renderHistoryPanel() {
   }
 }
 
+/* ---- 🗄 Backup: keep collections + history in a file, not just in Chrome ---- */
+// Chrome wipes an extension's storage — local and sync alike — when the
+// extension is removed, so a linked file is the only thing that survives it.
+// Linking needs a file picker, which Chrome refuses to open inside a DevTools
+// panel, so that step hands off to the backup.html tab; everything else
+// (restore-from-a-copy, download-a-copy) works right here.
+
+els.backupBtn.addEventListener("click", () => {
+  const willOpen = els.backupMenu.hidden;
+  closePanels();
+  if (!willOpen) return;
+  refreshBackupState();
+  els.backupMenu.hidden = false;
+});
+
+// Reflect whether a file is linked, and whether Chrome still lets us write it.
+async function refreshBackupState() {
+  const st = await backup.status();
+  const linked = !!(st && st.linked);
+  const ready = !!(st && st.ready);
+  els.backupMenu.querySelector('[data-act="unlink"]').hidden = !linked;
+  els.backupBtn.classList.toggle("warn", linked && !ready);
+
+  if (!linked) {
+    els.backupState.className = "menu-note";
+    els.backupState.textContent = "Not linked — collections and history are lost if you remove the extension.";
+  } else if (ready) {
+    els.backupState.className = "menu-note ok";
+    els.backupState.textContent = `Auto-saving to “${st.name}”.`;
+  } else {
+    els.backupState.className = "menu-note warn";
+    els.backupState.textContent = `“${st.name}” needs re-authorising — Chrome drops file access when it restarts. Use “Link backup file…”.`;
+  }
+}
+
+els.backupMenu.addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const act = btn.dataset.act;
+  if (act === "link") {
+    // Opens backup.html; it messages us back ("backup.linked") when it's done.
+    backup.openHelper("link");
+    closePanels();
+  } else if (act === "restore") {
+    els.backupFile.click();
+  } else if (act === "download") {
+    downloadBackup();
+    closePanels();
+  } else if (act === "unlink") {
+    backup.unlink().then(refreshBackupState);
+  }
+});
+
+function downloadBackup() {
+  const blob = new Blob([backup.serialize(collections, history)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ciphernet-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  flashEnc("Backup downloaded ✓");
+}
+
+// Restore from any backup copy. A plain file input, so it works in the panel
+// itself — unlike the File System Access picker that linking needs.
+els.backupFile.addEventListener("change", async () => {
+  const file = els.backupFile.files && els.backupFile.files[0];
+  els.backupFile.value = ""; // let the same file be picked again later
+  if (!file) return;
+  closePanels();
+  try {
+    const res = await backup.restoreFromText(await file.text());
+    collections = res.collections;
+    history = res.history;
+    currentRef = null;
+    currentSnapshot = null;
+    checkDirty();
+    flashEnc(`Restored ${res.requests} request(s) in ${res.folders} folder(s) and ${res.history.length} history entries ✓`);
+  } catch (err) {
+    flashEnc(`Restore failed: ${err.message || err}`, true);
+  }
+});
+
 function renameFolder(folder) {
   const next = (prompt("Rename folder:", folder) || "").trim();
   if (!next || next === folder) return;
@@ -263,7 +383,7 @@ function renameFolder(folder) {
   collections[next] = collections[folder];
   delete collections[folder];
   if (currentRef && currentRef.folder === folder) currentRef.folder = next;
-  setCollections(collections, (err) => flashEnc(err ? `Rename failed: ${err}` : `Renamed folder to “${next}”`, !!err));
+  persistCollections((err) => flashEnc(err ? `Rename failed: ${err}` : `Renamed folder to “${next}”`, !!err));
   renderCollectionTree();
 }
 function renameApi(folder, name) {
@@ -275,7 +395,7 @@ function renameApi(folder, name) {
   f[next] = f[name];
   delete f[name];
   if (currentRef && currentRef.folder === folder && currentRef.name === name) currentRef.name = next;
-  setCollections(collections, (err) => flashEnc(err ? `Rename failed: ${err}` : `Renamed to “${next}”`, !!err));
+  persistCollections((err) => flashEnc(err ? `Rename failed: ${err}` : `Renamed to “${next}”`, !!err));
   renderCollectionTree();
 }
 function loadApi(folder, name) {
@@ -294,13 +414,13 @@ function loadApi(folder, name) {
 function delFolder(folder) {
   delete collections[folder];
   if (currentRef && currentRef.folder === folder) { currentRef = null; checkDirty(); }
-  setCollections(collections, () => flashEnc(`Folder “${folder}” deleted`));
+  persistCollections(() => flashEnc(`Folder “${folder}” deleted`));
   renderCollectionTree();
 }
 function delApi(folder, name) {
   if (collections[folder]) delete collections[folder][name];
   if (currentRef && currentRef.folder === folder && currentRef.name === name) { currentRef = null; checkDirty(); }
-  setCollections(collections, () => flashEnc(`Deleted “${name}”`));
+  persistCollections(() => flashEnc(`Deleted “${name}”`));
   renderCollectionTree();
 }
 

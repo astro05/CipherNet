@@ -37,6 +37,18 @@
             <div id="historyPanel" class="pop-panel tree-panel" hidden></div>
           </div>
           <button id="saveReqBtn" title="Save changes to the loaded request" hidden>💾 Save</button>
+          <div class="menu-wrap">
+            <button id="backupBtn" class="ghost" title="Keep collections &amp; history in a file so they survive removing the extension">🗄 Backup ▾</button>
+            <div id="backupMenu" class="menu" hidden>
+              <div id="backupState" class="menu-note">Not linked</div>
+              <div class="menu-sep"></div>
+              <button data-act="link">Link backup file…</button>
+              <button data-act="restore">Restore from file…</button>
+              <button data-act="download">Download a copy</button>
+              <button data-act="unlink" hidden>Stop auto-saving</button>
+            </div>
+          </div>
+          <input id="backupFile" type="file" accept="application/json,.json" hidden />
         </span>
         <!-- Network-only controls: shown in the Network view, hidden in the Encrypt URL / Decrypt tools. -->
         <span id="netControls" class="net-controls">

@@ -1,4 +1,4 @@
-**Version:** 2.14.0 | **Last Modified:** 2026-07-14
+**Version:** 2.15.0 | **Last Modified:** 2026-07-14
 
 # Features
 
@@ -22,15 +22,26 @@
 - **Rename folder** — rename a folder (with ✎ button)
 - **Rename request** — rename a saved API request (with ✎ button)
 - **Save button** — update a previously saved request after modifying it
-- **Save request** — persist URLs, payloads, and Bearer tokens via `chrome.storage.sync`, so Collections survive uninstalling and reinstalling the extension (requires the browser signed in with Chrome Sync enabled — otherwise sync storage behaves like local storage and won't survive uninstall)
+- **Save request** — persist URLs, payloads, and Bearer tokens via `chrome.storage.sync` (see **Backup & Restore** for surviving removal of the extension)
 
 ## Request History
 - **🕘 History button** — beside ➕ Add in the Encrypt URL toolbar; opens a dropdown of the last 100 sent requests, newest first
 - **Auto-logged** — every Send Encrypt / Send Decrypt call is logged automatically, no naming needed (unlike Collections)
 - **Load from history** — click an entry to reload its URL/payload/Bearer token back into the composer
 - **Per-entry delete + Clear all** — remove one entry (🗑) or clear the whole log
-- **Survives uninstall** — stored via `chrome.storage.sync` like Collections, same signed-in-profile caveat applies
 - **Compact by design** — stores the request (URL/body/token) and a response summary (status/size/time), not the full response body, to stay well inside chrome.storage.sync's 100 KB/8 KB-per-item quota across 100 entries
+
+## Backup & Restore (Collections + History)
+- **Why it exists** — Chrome erases an extension's storage, `local` **and** `sync` alike, when the extension is removed. (Synced settings only come back for Web Store installs on a signed-in profile; a sideloaded build gets nothing back.) A file on disk is the only copy that survives.
+- **🗄 Backup menu** — in the Encrypt URL toolbar; shows whether a backup file is linked and whether Chrome still permits writing to it
+- **Link backup file** — pick a file once; Collections and History are written to it from then on
+- **Automatic save** — every add / rename / delete / send writes the file (debounced), so it never lags behind the live store
+- **Automatic pull on load** — each time the panel opens, the linked file is read and merged back in, with no interaction
+- **Restore after re-adding the extension** — re-add, open 🗄 Backup → *Link backup file…* → **Open existing backup**, and every folder, request and history entry comes back
+- **Restore from file** — merge any backup copy into the current Collections/History (plain file picker, works in the panel)
+- **Download a copy** — one-off snapshot, e.g. to move Collections to another machine
+- **Non-destructive merges** — a restore unions folders and requests rather than replacing them; history is de-duplicated by timestamp
+- **Keys are never backed up** — AES keys and IVs stay in `chrome.storage` and are never written to the file (PRD §24). The file *does* contain any Bearer tokens saved with a request, so it's kept wherever the user chose to put it.
 
 ## Decryption
 - **Auto-lenient mode** — when strict decryption fails, automatically retry by trimming to whole 16-byte blocks without PKCS7 validation

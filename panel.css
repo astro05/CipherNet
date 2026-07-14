@@ -150,6 +150,12 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .menu label.active { background: var(--sel); color: var(--sel-fg); }
 .menu label.active:hover { background: var(--sel-hover); }
 .menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
+/* non-clickable status line inside a menu (e.g. which backup file is linked) */
+.menu-note { padding: 5px 8px; color: var(--muted); white-space: normal; max-width: 240px; }
+.menu-note.ok { color: var(--ok); }
+.menu-note.warn { color: var(--err); }
+/* the Backup button flags a linked file Chrome has revoked access to */
+#backupBtn.warn { color: var(--err); }
 
 /* resource-type filter pills */
 .filters-row { gap: 6px; }

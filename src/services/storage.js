@@ -84,6 +84,21 @@ function removeKeys(keys) {
 function bytesInUse() {
   return new Promise((resolve) => chrome.storage.sync.getBytesInUse(null, resolve));
 }
+// One stored history entry: the request as sent plus a response *summary*.
+function trimEntry(entry) {
+  return {
+    method: entry.method,
+    mode: entry.mode,
+    url: truncate(entry.url, HIST_FIELD_MAX),
+    body: truncate(entry.body, HIST_FIELD_MAX),
+    token: truncate(entry.token, HIST_FIELD_MAX),
+    status: entry.status,
+    statusText: truncate(entry.statusText, 200),
+    timeMs: entry.timeMs,
+    size: entry.size,
+    at: entry.at,
+  };
+}
 
 // Oldest-first array of history entries (each tagged with its storage `_key`
 // so removeHistoryEntry can target it).
@@ -101,18 +116,7 @@ export async function loadHistory() {
 // On success, resolves { ok: true, key } so the caller can mirror it
 // in-memory (e.g. for delete) without a round-trip read.
 export async function addHistoryEntry(entry) {
-  const trimmed = {
-    method: entry.method,
-    mode: entry.mode,
-    url: truncate(entry.url, HIST_FIELD_MAX),
-    body: truncate(entry.body, HIST_FIELD_MAX),
-    token: truncate(entry.token, HIST_FIELD_MAX),
-    status: entry.status,
-    statusText: truncate(entry.statusText, 200),
-    timeMs: entry.timeMs,
-    size: entry.size,
-    at: entry.at,
-  };
+  const trimmed = trimEntry(entry);
 
   const idx = await getIndex();
   let order = idx.order.slice();
@@ -145,4 +149,35 @@ export async function removeHistoryEntry(key) {
 export async function clearHistory() {
   const idx = await getIndex();
   await removeKeys([...idx.order, HIST_INDEX_KEY]);
+}
+
+// Replace the whole history with `entries` (oldest-first) — used by a backup
+// restore, which brings back a batch at once rather than one send at a time.
+// Newest entries win if the batch doesn't fit: it's written newest-first until
+// the item cap or the sync quota is reached, then the rest is dropped. Resolves
+// with what was actually stored (oldest-first, each tagged with its `_key`).
+export async function setHistoryBulk(entries) {
+  await clearHistory();
+
+  const newestFirst = entries.slice().reverse().slice(0, HIST_MAX_ITEMS);
+  let used = await bytesInUse(); // collections + settings, now that history is gone
+
+  const kept = []; // newest-first
+  const writes = {};
+  for (const entry of newestFirst) {
+    const trimmed = trimEntry(entry);
+    const est = JSON.stringify(trimmed).length + 40; // + key name/envelope overhead
+    if (used + est > SYNC_SAFETY_BYTES) break;
+    used += est;
+    const key = histKey(kept.length);
+    writes[key] = trimmed;
+    kept.push({ ...trimmed, _key: key });
+  }
+
+  const order = kept.map((e) => e._key).reverse(); // storage keeps oldest-first
+  writes[HIST_INDEX_KEY] = { next: kept.length, order };
+  const ok = await new Promise((resolve) =>
+    chrome.storage.sync.set(writes, () => resolve(!chrome.runtime.lastError))
+  );
+  return ok ? kept.reverse() : [];
 }

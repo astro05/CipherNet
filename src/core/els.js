@@ -46,6 +46,11 @@ export const els = {
   saveReqBtn: document.getElementById("saveReqBtn"),
   historyBtn: document.getElementById("historyBtn"),
   historyPanel: document.getElementById("historyPanel"),
+  // backup: mirrors collections + history to a file so they survive uninstall
+  backupBtn: document.getElementById("backupBtn"),
+  backupMenu: document.getElementById("backupMenu"),
+  backupState: document.getElementById("backupState"),
+  backupFile: document.getElementById("backupFile"),
   // network / decrypt views (leading toolbar buttons)
   networkBtn: document.getElementById("networkBtn"),
   netControls: document.getElementById("netControls"),

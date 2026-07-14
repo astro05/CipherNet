@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>CipherNet — Backup</title>
+    <link rel="stylesheet" href="panel.css" />
+    <style>
+      /* This page exists only because Chrome refuses to open a file picker
+         inside a DevTools panel (a cross-origin iframe). It is a plain top-level
+         extension page, so the picker works here. */
+      body { padding: 28px 32px; max-width: 640px; font-size: 13px; line-height: 1.5; }
+      h1 { font-size: 17px; margin: 0 0 4px; }
+      .lede { color: var(--muted); margin: 0 0 20px; }
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+        background: var(--bg2);
+      }
+      .card h2 { font-size: 13px; margin: 0 0 4px; }
+      .card p { color: var(--muted); margin: 0 0 10px; }
+      .warn { color: var(--err); }
+      #status { margin-top: 16px; min-height: 20px; }
+      #status.ok { color: var(--ok); }
+      #status.err { color: var(--err); }
+      .linked { color: var(--muted); margin-bottom: 18px; }
+    </style>
+  </head>
+  <body>
+    <h1>Backup — Collections &amp; History</h1>
+    <p class="lede">
+      Chrome erases an extension's storage when the extension is removed, so saved requests
+      and history are mirrored to a file you choose. Once linked, every change is written to
+      it automatically, and it is read back automatically each time the panel opens.
+    </p>
+
+    <div class="linked" id="linked"></div>
+
+    <div class="card" id="cardOpen">
+      <h2>Restore an existing backup</h2>
+      <p>
+        Pick a backup file you already have — for example after re-adding the extension. Its
+        contents are merged back into Collections and History, and the file is linked for
+        future auto-saves.
+      </p>
+      <button id="openBtn">Open existing backup…</button>
+    </div>
+
+    <div class="card" id="cardCreate">
+      <h2>Create a new backup file</h2>
+      <p>
+        Choose where to keep <code>ciphernet-backup.json</code>. Your current Collections and
+        History are written to it right away.
+      </p>
+      <button id="createBtn">Create backup file…</button>
+    </div>
+
+    <div class="card" id="cardGrant" hidden>
+      <h2>Re-authorise the backup file</h2>
+      <p>
+        Chrome drops file permissions when the browser restarts. Grant access once and
+        auto-save resumes.
+      </p>
+      <button id="grantBtn">Allow access</button>
+    </div>
+
+    <p class="warn">
+      The backup file is plain JSON on your disk and includes any bearer tokens saved with a
+      request. Keep it somewhere private. AES keys and IVs are never written to it.
+    </p>
+
+    <div id="status" class="muted"></div>
+
+    <script type="module" src="src/ui/backupPage.js"></script>
+  </body>
+</html>

@@ -1,4 +1,4 @@
-**Version:** 2.14.0 | **Last Modified:** 2026-07-14
+**Version:** 2.15.0 | **Last Modified:** 2026-07-14
 
 ![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)
@@ -116,6 +116,22 @@ to .NET's default — so round-trips match byte-for-byte.
 
     Persisted in `chrome.storage`; pre-2.9 flat saves migrate into a **Default**
     folder automatically.
+  - **🗄 Backup — surviving removal of the extension.** Chrome erases an
+    extension's storage (`local` *and* `sync`) when the extension is removed, so
+    Collections and History are also mirrored to a **file you pick**:
+    - **Link backup file…** — opens a small helper tab (Chrome refuses to open a
+      file picker inside a DevTools panel) offering **Create a new backup file**
+      or **Open an existing backup**. Pick one and every change from then on is
+      written to it automatically.
+    - **Automatic pull** — each time the panel opens, the linked file is read and
+      merged back in. So after re-adding the extension you link the same file
+      once and your folders, requests and history are simply there again.
+    - **Restore from file… / Download a copy** — merge in any backup copy, or
+      take a one-off snapshot (e.g. to move Collections to another machine).
+    - The file holds saved requests (including any Bearer tokens) and history.
+      **AES keys and IVs are never written to it.** Chrome drops file permissions
+      when the browser restarts; the 🗄 Backup button turns red when auto-save
+      needs re-authorising, which is one click.
   - **Response viewer** — a Postman-style panel: a status · time · size · method
     URL line, then tabs:
     - **Body** — the response body via `bodyView` (decrypted when possible, with
