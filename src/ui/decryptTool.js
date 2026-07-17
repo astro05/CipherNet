@@ -1,9 +1,12 @@
-// ui/decryptTool.js — the 🔓 Decrypt drawer: paste an encrypted (Base64) value
-// (or a full URL whose query string is encrypted) and get the decrypted,
-// formatted result with a Copy button. The output reuses bodyView (same as the
-// Response detail tab): pretty-printed JSON when the plaintext is JSON, a
-// raw/decrypted toggle, and Copy. Decryption auto-falls back to the lenient
-// (ragged-tolerant) path when the strict decrypt fails.
+// ui/decryptTool.js — the 🔐 Encrypt/Decrypt drawer: paste a value and either
+// Encrypt it (plaintext → AES-128-CBC → Base64, the scheme the CipherNet backend
+// expects) or Decrypt it (an encrypted Base64 value, or a full URL whose query
+// string is encrypted). Both accept a bare value or a "base?query" URL, in which
+// case only the query is transformed and the full URL is shown. The decrypt
+// output reuses bodyView (same as the Response detail tab): pretty-printed JSON
+// when the plaintext is JSON, a raw/decrypted toggle, and Copy. Decryption
+// auto-falls back to the lenient (ragged-tolerant) path when the strict decrypt
+// fails.
 
 import { state } from "../core/state.js";
 import { els } from "../core/els.js";
@@ -18,10 +21,15 @@ els.decryptToggle.addEventListener("click", () => {
   showView(open ? "decrypt" : "network");
   if (open) els.decInput.focus();
 });
+els.encryptValueBtn.addEventListener("click", runEncryptValue);
 els.decryptBtn.addEventListener("click", runDecrypt);
 els.decInput.addEventListener("keydown", (e) => {
-  // Ctrl/Cmd+Enter runs the decrypt (a bare Enter inserts a newline in the box).
-  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runDecrypt(); }
+  // Ctrl/Cmd+Enter decrypts; add Shift to encrypt (a bare Enter inserts a newline).
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    if (e.shiftKey) runEncryptValue();
+    else runDecrypt();
+  }
 });
 els.decryptClear.addEventListener("click", () => {
   els.decInput.value = "";
@@ -61,6 +69,36 @@ function urlWithQuery(input) {
   if (!query) return null;
   const looksUrl = /^[a-z][a-z0-9+.-]*:\/\//i.test(base) || base.includes("/");
   return looksUrl ? { base, query } : null;
+}
+
+// Encrypt the pasted value with the saved key. A "base?query" URL encrypts only
+// the query and shows the full URL (mirroring the decrypt path); anything else is
+// encrypted whole. The result is a plain ciphertext string, so it's shown with
+// simple label + Copy rows rather than bodyView.
+async function runEncryptValue() {
+  const raw = els.decInput.value;
+  els.decOutput.hidden = true;
+  els.decOutput.innerHTML = "";
+
+  if (!raw.trim()) { flashDec("Paste a value to encrypt.", true); return; }
+  if (!state.key) { flashDec("Set the AES key in 🔑 Key first.", true); return; }
+
+  flashDec("Encrypting…");
+  try {
+    const url = urlWithQuery(raw.trim());
+    if (url) {
+      const cipher = await CipherNetCrypto.encrypt(url.query, state.key, state.iv);
+      els.decOutput.appendChild(decOutRow("Encrypted URL", url.base + "?" + cipher));
+      els.decOutput.appendChild(decOutRow("Encrypted query", cipher));
+    } else {
+      const cipher = await CipherNetCrypto.encrypt(raw, state.key, state.iv);
+      els.decOutput.appendChild(decOutRow("Encrypted", cipher));
+    }
+    els.decOutput.hidden = false;
+    flashDec("Encrypted ✓");
+  } catch (e) {
+    flashDec(e.message || "Encryption failed.", true);
+  }
 }
 
 async function runDecrypt() {

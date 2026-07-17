@@ -10,9 +10,9 @@
         <img id="logo" src="assets/icon16.png" alt="CipherNet" title="CipherNet" />
         <button id="keysToggle" class="ghost" title="Key settings">🔑 Key</button>
         <button id="networkBtn" class="ghost active" title="Show the Network panel">🌐 Network</button>
-        <button id="encryptToggle" class="ghost" title="Encrypt a URL / payload with the saved key">🔒 Encrypt URL</button>
-        <button id="decryptToggle" class="ghost" title="Decrypt an encrypted value with the saved key">🔓 Decrypt</button>
-        <!-- Encrypt-URL collection tools: shown only while the Encrypt URL view is open. -->
+        <button id="encryptToggle" class="ghost" title="Compose and send CipherNet API requests">🔒 API Testing</button>
+        <button id="decryptToggle" class="ghost" title="Encrypt or decrypt a value with the saved key">🔐 Encrypt/Decrypt</button>
+        <!-- API Testing collection tools: shown only while the API Testing view is open. -->
         <span id="encTools" class="enc-tools" hidden>
           <span class="sep"></span>
           <div class="menu-wrap">
@@ -50,7 +50,7 @@
           </div>
           <input id="backupFile" type="file" accept="application/json,.json" hidden />
         </span>
-        <!-- Network-only controls: shown in the Network view, hidden in the Encrypt URL / Decrypt tools. -->
+        <!-- Network-only controls: shown in the Network view, hidden in the API Testing / Encrypt/Decrypt tools. -->
         <span id="netControls" class="net-controls">
           <span class="sep"></span>
           <button id="pauseBtn" class="record recording" title="Stop / resume capturing">●</button>
@@ -115,10 +115,9 @@
           <label class="enc-field"><span>Payload / Body</span><textarea id="encBody" spellcheck="false" rows="1" placeholder='{"userId":42}'></textarea></label>
           <label class="enc-field enc-field-token"><span>Bearer Token — not encrypted</span><textarea id="encToken" spellcheck="false" rows="1" placeholder="token (± &quot;Bearer &quot;)"></textarea></label>
           <div class="enc-actions">
-            <button id="encryptBtn">Encrypt</button>
             <button id="encryptClear" class="ghost">Clear</button>
-            <button id="sendEncryptBtn" title="Encrypt the query/body, then send the request">Send Encrypt</button>
-            <button id="sendDecryptBtn" title="Send the request as-is (no encryption)">Send Decrypt</button>
+            <button id="sendEncryptBtn" title="Encrypt the query/body, then send the request">Send Encrypted</button>
+            <button id="sendDecryptBtn" title="Send the request as-is (no encryption)">Send Plain</button>
             <span id="encStatus" class="muted"></span>
           </div>
         </div>
@@ -135,16 +134,16 @@
             <div id="encParamsBody"></div>
           </div>
         </div>
-        <div id="encOutput" class="enc-output" hidden></div>
         <div id="encResponse" class="enc-response" hidden></div>
       </div>
       <div class="tb-row decryptor" id="decryptRow">
         <div class="enc-inputs">
           <label class="enc-field enc-field-wide">
-            <span>Encrypted value</span>
-            <textarea id="decInput" spellcheck="false" rows="3" placeholder="paste the encrypted value."></textarea>
+            <span>Value</span>
+            <textarea id="decInput" spellcheck="false" rows="3" placeholder="paste a value — Encrypt to encode it, Decrypt to decode it"></textarea>
           </label>
           <div class="enc-actions">
+            <button id="encryptValueBtn" title="Encrypt (Ctrl/Cmd+Shift+Enter)">Encrypt</button>
             <button id="decryptBtn" title="Decrypt (Ctrl/Cmd+Enter)">Decrypt</button>
             <button id="decryptClear" class="ghost">Clear</button>
             <span id="decStatus" class="muted"></span>

@@ -57,7 +57,7 @@ export function setCollections(map, cb) {
 
 /* ------------------------------- history -------------------------------- */
 // Request History: an automatic (unnamed) log of the last HIST_MAX_ITEMS
-// Send Encrypt / Send Decrypt requests, so they can be reloaded later. Each
+// Send Encrypted / Send Plain requests, so they can be reloaded later. Each
 // entry holds the request (URL/body/token) and a response summary — not the
 // full response body, which would blow the sync quota well before 100
 // entries. Also stored in chrome.storage.sync to survive uninstall.

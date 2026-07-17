@@ -89,16 +89,16 @@ body { display: flex; flex-direction: column; }
   border-bottom: 1px solid var(--border);
   padding: 5px 8px;
 }
-/* In a tool view (Encrypt URL / Decrypt) the network list is hidden, so let the
+/* In a tool view (API Testing / Encrypt/Decrypt) the network list is hidden, so let the
    toolbar (the whole tool drawer) take the remaining height and scroll when it
    overflows. */
 body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .tb-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* .tb-row sets display:flex, which beats the UA [hidden] rule, so hide rows
-   explicitly when a row is collapsed (e.g. filters row in Encrypt URL mode). */
+   explicitly when a row is collapsed (e.g. filters row in API Testing mode). */
 .tb-row[hidden] { display: none; }
 /* Network-only controls: display:contents lets the children lay out in the
-   toolbar flex row directly; hidden (in the Encrypt URL / Decrypt views) removes
+   toolbar flex row directly; hidden (in the API Testing / Encrypt/Decrypt views) removes
    them and their whole subtree. */
 .net-controls { display: contents; }
 .net-controls[hidden] { display: none; }
@@ -221,7 +221,7 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 #toolbar button.ghost { background: transparent; }
 #toolbar button.record { color: var(--muted); font-size: 13px; line-height: 1; }
 #toolbar button.record.recording { color: var(--err); }
-/* toggled-on toolbar button (e.g. Encrypt URL while its tool is open) */
+/* toggled-on toolbar button (e.g. API Testing while its tool is open) */
 #toolbar button.active { background: var(--sel); border-color: var(--accent); color: var(--sel-fg); }
 /* blink the 🔑 Key button RED while no key is saved so the user notices it's needed */
 @keyframes keyBlink {
@@ -254,7 +254,7 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .keys label { display: flex; align-items: center; gap: 4px; }
 .keys input { width: 200px; font-family: Consolas, monospace; }
 
-/* Encrypt URL / Decrypt tools (drawers) */
+/* API Testing / Encrypt/Decrypt tools (drawers) */
 .encryptor, .decryptor { display: none; flex-direction: column; align-items: stretch; gap: 8px; }
 .encryptor.open, .decryptor.open { display: flex; }
 /* the Decrypt drawer's input spans the row and its textarea fills its column */
@@ -285,7 +285,7 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .enc-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; align-self: flex-end; padding-bottom: 1px; }
 
 /* collection tools live in the toolbar; display:contents lets them flow in the
-   flex row, and they're shown only in the Encrypt URL view. */
+   flex row, and they're shown only in the API Testing view. */
 .enc-tools { display: contents; }
 .enc-tools[hidden] { display: none; }
 
@@ -343,7 +343,7 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   padding: 3px 6px;
 }
 
-/* Postman-style Query Params editor inside the Encrypt URL tool */
+/* Postman-style Query Params editor inside the API Testing tool */
 .enc-params { display: flex; flex-direction: column; gap: 4px; }
 .enc-params[hidden] { display: none; }
 .enc-params-title { color: var(--muted); font-size: 11px; }
@@ -398,21 +398,21 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 }
 .ep-remove:hover { color: var(--err); }
 
-/* Encrypt URL drawer action buttons — fixed brand colors (solid fill, white text).
+/* API Testing drawer action buttons — fixed brand colors (solid fill, white text).
    The #toolbar #id selectors outrank #toolbar button / .ghost so the fills win. */
-#toolbar #encryptBtn     { background: #2563eb; border-color: #2563eb; color: #fff; }
 #toolbar #encryptClear   { background: #6b7280; border-color: #6b7280; color: #fff; }
 #toolbar #sendEncryptBtn { background: #16a34a; border-color: #16a34a; color: #fff; }
 #toolbar #sendDecryptBtn { background: #7c3aed; border-color: #7c3aed; color: #fff; }
-#toolbar #encryptBtn:hover,
 #toolbar #encryptClear:hover,
 #toolbar #sendEncryptBtn:hover,
 #toolbar #sendDecryptBtn:hover { filter: brightness(1.12); }
 
-/* Decrypt drawer action buttons — decrypt = purple, clear = gray (matches the
-   Encrypt drawer scheme). */
-#toolbar #decryptBtn   { background: #7c3aed; border-color: #7c3aed; color: #fff; }
-#toolbar #decryptClear { background: #6b7280; border-color: #6b7280; color: #fff; }
+/* Encrypt/Decrypt drawer action buttons — encrypt = blue, decrypt = purple,
+   clear = gray (matches the API Testing drawer scheme). */
+#toolbar #encryptValueBtn { background: #2563eb; border-color: #2563eb; color: #fff; }
+#toolbar #decryptBtn      { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+#toolbar #decryptClear    { background: #6b7280; border-color: #6b7280; color: #fff; }
+#toolbar #encryptValueBtn:hover,
 #toolbar #decryptBtn:hover,
 #toolbar #decryptClear:hover { filter: brightness(1.12); }
 
@@ -519,7 +519,7 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 /* -------------------------------- main --------------------------------- */
 #main { flex: 1 1 auto; display: flex; min-height: 0; }
 /* The #main id rule sets display:flex, which beats the UA [hidden] rule, so
-   hide it explicitly when the Encrypt URL tool takes over the view. */
+   hide it explicitly when the API Testing tool takes over the view. */
 #main[hidden] { display: none; }
 
 #listPane { flex: 1 1 auto; overflow: auto; min-width: 0; position: relative; }

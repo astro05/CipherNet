@@ -1,4 +1,4 @@
-**Version:** 2.15.0 | **Last Modified:** 2026-07-14
+**Version:** 2.16.1 | **Last Modified:** 2026-07-17
 
 # Features
 
@@ -18,22 +18,22 @@
 - **Collection tree** — dropdown showing all folders and requests in a tree view
 - **Delete folder** — remove a folder and all its requests (with 🗑 button)
 - **Delete request** — remove a single saved request (with 🗑 button)
-- **Load request** — click any API in the tree to load it into the Encrypt URL tool
+- **Load request** — click any API in the tree to load it into the API Testing tool
 - **Rename folder** — rename a folder (with ✎ button)
 - **Rename request** — rename a saved API request (with ✎ button)
 - **Save button** — update a previously saved request after modifying it
 - **Save request** — persist URLs, payloads, and Bearer tokens via `chrome.storage.sync` (see **Backup & Restore** for surviving removal of the extension)
 
 ## Request History
-- **🕘 History button** — beside ➕ Add in the Encrypt URL toolbar; opens a dropdown of the last 100 sent requests, newest first
-- **Auto-logged** — every Send Encrypt / Send Decrypt call is logged automatically, no naming needed (unlike Collections)
+- **🕘 History button** — beside ➕ Add in the API Testing toolbar; opens a dropdown of the last 100 sent requests, newest first
+- **Auto-logged** — every Send Encrypted / Send Plain call is logged automatically, no naming needed (unlike Collections)
 - **Load from history** — click an entry to reload its URL/payload/Bearer token back into the composer
 - **Per-entry delete + Clear all** — remove one entry (🗑) or clear the whole log
 - **Compact by design** — stores the request (URL/body/token) and a response summary (status/size/time), not the full response body, to stay well inside chrome.storage.sync's 100 KB/8 KB-per-item quota across 100 entries
 
 ## Backup & Restore (Collections + History)
 - **Why it exists** — Chrome erases an extension's storage, `local` **and** `sync` alike, when the extension is removed. (Synced settings only come back for Web Store installs on a signed-in profile; a sideloaded build gets nothing back.) A file on disk is the only copy that survives.
-- **🗄 Backup menu** — in the Encrypt URL toolbar; shows whether a backup file is linked and whether Chrome still permits writing to it
+- **🗄 Backup menu** — in the API Testing toolbar; shows whether a backup file is linked and whether Chrome still permits writing to it
 - **Link backup file** — pick a file once; Collections and History are written to it from then on
 - **Automatic save** — every add / rename / delete / send writes the file (debounced), so it never lags behind the live store
 - **Automatic pull on load** — each time the panel opens, the linked file is read and merged back in, with no interaction
@@ -48,7 +48,7 @@
 - **Decrypted request body** — show the plaintext payload
 - **Decrypted request headers** — show decrypted URL and Bearer token in the Headers tab
 - **Decrypted response body** — show the plaintext response, pretty-printed if JSON
-- **Pretty-printed JSON everywhere** — Response tab, Preview drawer's Body tab, and the 🔓 Decrypt tool all pretty-print + syntax-highlight JSON bodies, whether decrypted or shown raw
+- **Pretty-printed JSON everywhere** — Response tab, Preview drawer's Body tab, and the 🔐 Encrypt/Decrypt tool all pretty-print + syntax-highlight JSON bodies, whether decrypted or shown raw
 - **Decrypted query string** — show plaintext query parameters in a parsed table
 - **Encryption detection** — flag encrypted requests with 🔒
 - **Web Crypto API** — AES-128-CBC with PKCS7 (mirrors .NET backend)
@@ -62,14 +62,19 @@
 - **Response** — decrypted response body, pretty-printed JSON; Copy copies the pretty-printed text (matching what's shown), not the raw minified string
 - **Timing** — DNS / Connect / SSL / Send / Waiting (TTFB) / Download with proportional breakdown bars
 
-## Encrypt URL Tool
+## Encrypt/Decrypt Tool
+- **Encrypt button** — encode a pasted value to CipherNet ciphertext (AES-128-CBC → Base64); a `base?query` URL encrypts only the query and shows the full URL
+- **Decrypt button** — decode an encrypted value (or a URL whose query string is encrypted) back to plaintext, with JSON preview, Copy, and a view raw/decrypted toggle
+- **Auto-lenient decrypt** — falls back to the ragged-tolerant path when strict decryption fails
+- **Keyboard shortcuts** — Ctrl/Cmd+Enter decrypts, Ctrl/Cmd+Shift+Enter encrypts
+
+## API Testing Tool
 - **Bearer Token field** — paste `Authorization` token (sent as-is, never encrypted, prepended with `Bearer ` if omitted)
 - **Copy buttons** — one-click copy for each output line
-- **Encrypt button** — convert plaintext URL/body to CipherNet-encrypted output (AES-128-CBC → Base64)
 - **Query Params editor** — Postman-style table (enable checkbox · Key · Value · Description) for composing query strings
 - **Round-trip encryption** — encrypted query strings (`path?<ciphertext>`) round-trip with decrypt path
-- **Send Decrypt button** — fire the request as-is (GET when no body, POST/JSON when body present)
-- **Send Encrypt button** — encrypt query string and body, then fire the request
+- **Send Plain button** — fire the request as-is (GET when no body, POST/JSON when body present)
+- **Send Encrypted button** — encrypt query string and body, then fire the request
 - **Unencrypted response passthrough** — when a sent request's response can't be decrypted, it's shown as plain raw output (not flagged as a decrypt error), since that's the expected result for a plaintext response
 - **Preview on unencrypted responses** — the Preview table is available even when the response wasn't encrypted, as long as the raw body itself is valid JSON
 
@@ -119,22 +124,22 @@
 - **Whole-word toggle** — match complete words only
 
 ## Toolbar
-- **Decrypt tool** — quick reverse of Encrypt URL
-- **Encrypt URL tool** — encode plaintext to CipherNet format
+- **Encrypt/Decrypt tool** — encrypt or decrypt a pasted value with the saved key
+- **API Testing tool** — compose and send CipherNet requests (Send Encrypted / Send Plain), with Collections & History
 - **Key box** — manage AES key and IV
 - **Network view** — the default request list + detail pane
-- **View switchers** — click to switch between Network, Encrypt URL, and Decrypt (active tool toggles back to Network)
+- **View switchers** — click to switch between Network, API Testing, and Encrypt/Decrypt (active tool toggles back to Network)
 
 ## User Interface
 - **Auto theme switching** — reads `chrome.devtools.panels.themeName` or `prefers-color-scheme`
 - **Dark/light theme** — full palette mirror of Chrome's Network panel
 - **Focused tool views** — opening Encrypt/Decrypt hides the list/detail view for focused editing
-- **Keyboard shortcut** — Ctrl/Cmd+Enter in Decrypt tool to decrypt
+- **Keyboard shortcut** — in the Encrypt/Decrypt tool, Ctrl/Cmd+Enter decrypts and Ctrl/Cmd+Shift+Enter encrypts
 - **Live re-render** — changing the key instantly updates all open requests
 
 ## View Modes
-- **Decrypt view** — paste encrypted value, get plaintext (with JSON preview, copy, view raw/decrypted toggle)
-- **Encrypt URL view** — compose plaintext, get CipherNet ciphertext (with query editor, Bearer token, Send buttons, Collections)
+- **Encrypt/Decrypt view** — paste a value and encrypt or decrypt it (with JSON preview, copy, view raw/decrypted toggle)
+- **API Testing view** — compose and send CipherNet requests (with query editor, Bearer token, Send buttons, Collections)
 - **Network view** — list + detail pane (default)
 
 ## Export

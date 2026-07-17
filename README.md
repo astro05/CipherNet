@@ -1,4 +1,4 @@
-**Version:** 2.15.0 | **Last Modified:** 2026-07-14
+**Version:** 2.16.1 | **Last Modified:** 2026-07-17
 
 ![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)
@@ -58,7 +58,7 @@ to .NET's default — so round-trips match byte-for-byte.
     Headers + Request Headers. When the query string decrypts, a **Request URL
     (decrypted)** row is added. When the request carries an `Authorization:
     Bearer …` header, a **Bearer Token** row appears (masked) with a **Copy**
-    button that copies the full token — handy for pasting into the Encrypt URL
+    button that copies the full token — handy for pasting into the API Testing
     tool below.
   - **Payload** — decrypted **Query String Parameters** (parsed into a table)
     and decrypted **Request Payload**, each with a **View raw / View decrypted**
@@ -71,9 +71,9 @@ to .NET's default — so round-trips match byte-for-byte.
   - **Cookies** — parsed Request and Response (Set-Cookie) cookie tables.
   - **Initiator** — initiator type, URL, and JS call stack when available.
 - **Leading toolbar buttons** — right after the CipherNet icon sit the view
-  switchers: **🔑 Key**, **🌐 Network**, **🔒 Encrypt URL** and **🔓 Decrypt**.
-  **Network** is the default view (the request list + detail pane); the Encrypt
-  URL and Decrypt tools open in place of it, and **🌐 Network** (or clicking the
+  switchers: **🔑 Key**, **🌐 Network**, **🔒 API Testing** and **🔐 Encrypt/Decrypt**.
+  **Network** is the default view (the request list + detail pane); the API
+  Testing and Encrypt/Decrypt tools open in place of it, and **🌐 Network** (or clicking the
   active tool again) brings the list back. The network-only toolbar controls
   (Record, Clear, Preserve log, Disable cache, Throttling, Search, Filter,
   Encrypted only, Export) show **only in the Network view** and are hidden while a
@@ -83,29 +83,25 @@ to .NET's default — so round-trips match byte-for-byte.
   re-renders the open request live, and **auto-closes the Key box**. While no key
   is saved the **🔑 Key** button **blinks red** so it's obvious one is needed.
   **Clear** wipes the stored key (and starts the blink again).
-- **Encrypt URL 🔒** — a small tool that does the reverse of decryption: paste a
-  plaintext **URL** and/or a **Payload / Body** and click **Encrypt** to get the
-  CipherNet-encrypted output (AES-128-CBC → Base64, using the saved key/IV). The URL's
-  **query string** is encrypted and spliced back in (`path?<ciphertext>`), so the
-  result round-trips with the decrypt path; a URL with no query string is left
-  unencrypted (only the query is encryptable). Each output line has a **Copy**
-  button. Handy for crafting or replaying
-  encrypted requests by hand. When the **URL** field holds a query string it's
-  broken out into a Postman-style **Query Params** table (enable checkbox · Key ·
-  Value · Description, with add/remove rows); editing the table rewrites the URL
-  and editing the URL rebuilds the table, so you can compose the query before
-  encrypting. Opening the tool hides the request list / detail view and the
-  resource-type filter row so you get a focused encrypt view; click **🌐 Network**
-  (or **🔒 Encrypt URL** again) to bring the network view back.
+- **API Testing 🔒** — a Postman-style composer for **sending** CipherNet requests.
+  Enter a **URL** and/or a **Payload / Body**, then use **Send Encrypted** / **Send
+  Plain** below to fire the request. When the **URL** field holds a query string
+  it's broken out into a Postman-style **Query Params** table (enable checkbox ·
+  Key · Value · Description, with add/remove rows); editing the table rewrites the
+  URL and editing the URL rebuilds the table, so you can compose the query before
+  sending. Opening the tool hides the request list / detail view and the
+  resource-type filter row so you get a focused view; click **🌐 Network** (or
+  **🔒 API Testing** again) to bring the network view back. (To encrypt a value on
+  its own — without sending — use **🔐 Encrypt/Decrypt**.)
   - **Bearer Token** — a field beside Payload/Body for an `Authorization` token.
     It is **never encrypted**; it's sent as-is (with `Bearer ` prepended if you
     omit it) on the Send requests below.
-  - **Send Encrypt** / **Send Decrypt** — fire the request like Postman. **Send
-    Encrypt** encrypts the query string and body first, then sends; **Send
-    Decrypt** sends the URL/body exactly as entered. The method is `GET` when
+  - **Send Encrypted** / **Send Plain** — fire the request like Postman. **Send
+    Encrypted** encrypts the query string and body first, then sends; **Send
+    Plain** sends the URL/body exactly as entered. The method is `GET` when
     there's no body, `POST` (JSON) when there is.
-  - **Collections (folders of saved requests)** — while the Encrypt URL view is
-    open, three tools appear in the toolbar after **🔓 Decrypt**:
+  - **Collections (folders of saved requests)** — while the API Testing view is
+    open, three tools appear in the toolbar after **🔐 Encrypt/Decrypt**:
     - **➕ Add** — opens a small panel to name the request (**API name**) and pick
       or create a **folder**, then saves it (URL, body, token) locally.
     - **📚 Collection** — a dropdown **tree** of every folder → API; click an API
@@ -142,20 +138,23 @@ to .NET's default — so round-trips match byte-for-byte.
       hides Set-Cookie).
     - **History** — every request sent this session; click a row to reload its
       response. (In-memory only.)
-- **Decrypt 🔓** — the quick reverse of Encrypt URL: paste any CipherNet-encrypted
-  (Base64) value and click **Decrypt** (or **Ctrl/Cmd+Enter**) to get the
-  plaintext, pretty-printed when it's JSON, with a **View raw / View decrypted**
-  toggle, a **Preview** table, and a **Copy** button. It uses the saved key/IV
-  and tries a few encodings (trimmed, unquoted, percent-decoded).
+- **Encrypt/Decrypt 🔐** — encrypt or decrypt a value with the saved key/IV. Paste
+  a value and either **Encrypt** (**Ctrl/Cmd+Shift+Enter**) to get the CipherNet
+  ciphertext (AES-128-CBC → Base64), or **Decrypt** (**Ctrl/Cmd+Enter**) to get the
+  plaintext. Decrypt pretty-prints JSON, offers a **View raw / View decrypted**
+  toggle, a **Preview** table, and a **Copy** button, and tries a few encodings
+  (trimmed, unquoted, percent-decoded); each Encrypt output line has a **Copy**
+  button.
   - **Preview** — when the decrypted body is tabular JSON (an array of objects,
     an object, or an array), a **Preview** button beside the raw/decrypted toggle
     shows it as a **table** with **click-to-sort** headers and a **per-column
     filter** box. The **View raw / decrypted** toggle stays visible in Preview,
     so one click jumps back to the text. Available anywhere a decrypted body is
-    shown (Decrypt tool, Encrypt URL response, and the request detail tabs).
-  - **Paste a whole URL** — if the input is a URL whose query string is encrypted
-    (`https://host/path?<ciphertext>`), the tool decrypts just the query and
-    shows the **full decrypted URL** (with Copy), plus the decrypted query body.
+    shown (Encrypt/Decrypt tool, API Testing response, and the request detail tabs).
+  - **Paste a whole URL** — if the input is a URL with a query string
+    (`https://host/path?<query>`), each button transforms just the query and
+    shows the **full URL** (with Copy): **Decrypt** decodes an encrypted query,
+    **Encrypt** encodes a plaintext one, plus the transformed query body.
   - **Auto-lenient** — a real AES-CBC ciphertext is always a multiple of 16
     bytes, and Web Crypto rejects anything else outright (unlike CryptoJS-based
     tools, which silently tolerate it). When a strict decrypt fails, the tool
@@ -163,7 +162,7 @@ to .NET's default — so round-trips match byte-for-byte.
     blocks and decrypts **without PKCS7 validation** — matching CryptoJS — so a
     value with a stray/truncated tail still decrypts (a note reports how many
     tail bytes were dropped; the very end may be garbled). The same auto-lenient
-    fallback applies to the Encrypt URL response body.
+    fallback applies to the API Testing response body.
 - **Filter** — a Chrome-style filter mini-language (everything else is a plain
   URL substring; prefix a term with `-` to negate):
 
@@ -286,10 +285,10 @@ ui with a single composition root:
 | `src/ui/table.js`            | Request list: columns, sort, resize, splitter        |
 | `src/ui/detail.js`           | Detail tabs (Headers/Payload/Preview/…)              |
 | `src/ui/jsonTable.js`        | Sortable / filterable JSON table (Preview)           |
-| `src/ui/views.js`            | Network / Encrypt URL / Decrypt view switcher        |
+| `src/ui/views.js`            | Network / API Testing / Encrypt/Decrypt view switcher |
 | `src/ui/keyBox.js`           | 🔑 Key box                                           |
-| `src/ui/encryptTool.js`      | 🔒 Encrypt URL tool + Send Encrypt/Decrypt           |
-| `src/ui/decryptTool.js`      | 🔓 Decrypt tool (paste ciphertext → plaintext)       |
+| `src/ui/encryptTool.js`      | 🔒 API Testing tool + Send Encrypted/Plain           |
+| `src/ui/decryptTool.js`      | 🔐 Encrypt/Decrypt tool (encrypt or decrypt a value)  |
 | `selftest.mjs`               | `node selftest.mjs` — verifies crypto vs. .NET       |
 
 ## Ship an obfuscated build

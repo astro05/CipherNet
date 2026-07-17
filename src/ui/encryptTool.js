@@ -1,10 +1,12 @@
-// ui/encryptTool.js — the 🔒 Encrypt URL drawer: a Postman-style Query Params
-// editor two-way bound to the URL, AES encryption of the query/body, and
-// Send Encrypt / Send Decrypt requests with a decrypting response viewer.
+// ui/encryptTool.js — the 🔒 API Testing drawer: a Postman-style Query Params
+// editor two-way bound to the URL, plus Send Encrypted / Send Plain requests
+// (Send Encrypted AES-encrypts the query/body first) with a decrypting response
+// viewer. Encrypting a value on its own lives in the 🔐 Encrypt/Decrypt drawer.
+// (Internally the view is still named "encrypt".)
 
 import { state } from "../core/state.js";
 import { els } from "../core/els.js";
-import { el, copyBtn } from "../core/dom.js";
+import { el } from "../core/dom.js";
 import { CipherNetCrypto } from "../core/crypto.js";
 import { safeDecode, fmtTime, fmtSize, stripQuotes } from "../core/format.js";
 import {
@@ -14,32 +16,22 @@ import * as backup from "../services/backup.js";
 import { bodyView } from "./detail.js";
 import { showView, currentView } from "./views.js";
 
-// Encrypt a plaintext URL/payload with the saved key the same way the CipherNet
-// backend does (AES-128-CBC -> Base64), so the output round-trips with the
-// decrypt path. The URL's query string is what gets encrypted; a bare value
-// (no "?") is encrypted whole.
 els.encryptToggle.addEventListener("click", () => {
-  // Toggle the Encrypt URL drawer; showView hides the network list / detail view
-  // and the resource-type filter row for a focused encrypt view (Network button
-  // or clicking Encrypt URL again returns to the list).
+  // Toggle the API Testing drawer; showView hides the network list / detail view
+  // and the resource-type filter row for a focused view (Network button
+  // or clicking API Testing again returns to the list).
   const open = currentView() !== "encrypt";
   showView(open ? "encrypt" : "network");
   if (open) renderParamsFromUrl();
 });
-els.encryptBtn.addEventListener("click", runEncrypt);
 els.sendEncryptBtn.addEventListener("click", () => sendRequest("encrypt"));
 els.sendDecryptBtn.addEventListener("click", () => sendRequest("decrypt"));
-els.encUrl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") { e.preventDefault(); runEncrypt(); }
-});
 // Live Postman-style Query Params: parse the URL's query into an editable table.
 els.encUrl.addEventListener("input", renderParamsFromUrl);
 els.encryptClear.addEventListener("click", () => {
   els.encUrl.value = "";
   els.encBody.value = "";
   els.encToken.value = "";
-  els.encOutput.hidden = true;
-  els.encOutput.innerHTML = "";
   els.encResponse.hidden = true;
   els.encResponse.innerHTML = "";
   renderParamsFromUrl(); // clears + hides the params table
@@ -253,7 +245,7 @@ function renderHistoryPanel() {
   panel.appendChild(actions);
 
   if (!history.length) {
-    panel.appendChild(el("div", "muted-block", "No requests sent yet — use Send Encrypt / Send Decrypt."));
+    panel.appendChild(el("div", "muted-block", "No requests sent yet — use Send Encrypted / Send Plain."));
     return;
   }
   for (const h of history) {
@@ -518,57 +510,7 @@ function splitUrlForEncrypt(url) {
   return { base: url.slice(0, i), query: url.slice(i + 1) };
 }
 
-// One output line: label + value + Copy button.
-function encOutRow(label, value) {
-  const row = el("div", "enc-out-row");
-  row.appendChild(el("div", "enc-out-label", label));
-  row.appendChild(el("div", "enc-out-value", value));
-  row.appendChild(copyBtn(() => value));
-  return row;
-}
-
-async function runEncrypt() {
-  const url = els.encUrl.value.trim();
-  const body = els.encBody.value;
-  els.encOutput.hidden = true;
-  els.encOutput.innerHTML = "";
-
-  if (!url && !body.trim()) { flashEnc("Enter a URL or payload to encrypt.", true); return; }
-  if (!state.key) { flashEnc("Set the AES key in 🔑 Key first.", true); return; }
-
-  // Only a URL's query string is encryptable; a URL with no query params is left
-  // as-is (there's nothing to encrypt in a bare path).
-  const { base, query } = url ? splitUrlForEncrypt(url) : { base: null, query: "" };
-  const hasQuery = base != null && query.trim() !== "";
-  const hasBody = body.trim() !== "";
-  if (url && !hasQuery && !hasBody) {
-    flashEnc("This URL has no query params to encrypt.", true);
-    return;
-  }
-
-  flashEnc("Encrypting…");
-  try {
-    const out = el("div");
-    if (hasQuery) {
-      const cipher = await CipherNetCrypto.encrypt(query, state.key, state.iv);
-      out.appendChild(encOutRow("Encrypted URL", base + "?" + cipher));
-      out.appendChild(encOutRow("Encrypted query", cipher));
-    } else if (url) {
-      out.appendChild(el("div", "muted", "URL has no query params — left unencrypted."));
-    }
-    if (hasBody) {
-      const cipher = await CipherNetCrypto.encrypt(body, state.key, state.iv);
-      out.appendChild(encOutRow("Encrypted body", cipher));
-    }
-    els.encOutput.appendChild(out);
-    els.encOutput.hidden = false;
-    flashEnc("Encrypted ✓");
-  } catch (e) {
-    flashEnc(e.message || "Encryption failed.", true);
-  }
-}
-
-/* ------- Send Encrypt / Send Decrypt: fire the request like Postman ------- */
+/* ------- Send Encrypted / Send Plain: fire the request like Postman ------- */
 // Common reason phrases (the browser leaves statusText empty on HTTP/2).
 function reasonPhrase(code) {
   const M = {
@@ -699,7 +641,7 @@ function renderResponseView(entry) {
 // Body tab: reuses bodyView (decrypted text when it decrypts, raw + reason when
 // not), with a note when the decrypt was lenient / best-effort. When decryption
 // fails outright, that almost always means the response simply wasn't
-// encrypted (e.g. a plain endpoint hit via Send Decrypt) rather than a real
+// encrypted (e.g. a plain endpoint hit via Send Plain) rather than a real
 // error, so it's shown as plain raw output instead of a decrypt-failure note.
 function respBody(entry) {
   if (!entry.body) return el("div", "muted-block", "No response body.");

@@ -1,8 +1,8 @@
 // ui/views.js — the leading toolbar buttons switch the panel between three
 // mutually-exclusive views:
 //   - "network": the request list + detail pane (the default),
-//   - "encrypt": the 🔒 Encrypt URL drawer,
-//   - "decrypt": the 🔓 Decrypt drawer.
+//   - "encrypt": the 🔒 API Testing drawer,
+//   - "decrypt": the 🔐 Encrypt/Decrypt drawer.
 // The Network panel is shown by default; encryptTool/decryptTool call showView
 // to open (or toggle back from) their drawers.
 
@@ -29,7 +29,7 @@ export function showView(name) {
   els.encryptRow.classList.toggle("open", name === "encrypt");
   els.decryptRow.classList.toggle("open", name === "decrypt");
 
-  // The Collection / Add / Save tools belong to the Encrypt URL view only.
+  // The Collection / Add / Save tools belong to the API Testing view only.
   els.encTools.hidden = name !== "encrypt";
   if (name !== "encrypt") { els.addPanel.hidden = true; els.collectionPanel.hidden = true; }
 
