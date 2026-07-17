@@ -1,4 +1,4 @@
-**Version:** 2.16.1 | **Last Modified:** 2026-07-17
+**Version:** 2.17.2 | **Last Modified:** 2026-07-18
 
 # Features
 
@@ -69,14 +69,21 @@
 - **Keyboard shortcuts** — Ctrl/Cmd+Enter decrypts, Ctrl/Cmd+Shift+Enter encrypts
 
 ## API Testing Tool
-- **Bearer Token field** — paste `Authorization` token (sent as-is, never encrypted, prepended with `Bearer ` if omitted)
-- **Copy buttons** — one-click copy for each output line
-- **Query Params editor** — Postman-style table (enable checkbox · Key · Value · Description) for composing query strings
-- **Round-trip encryption** — encrypted query strings (`path?<ciphertext>`) round-trip with decrypt path
-- **Send Plain button** — fire the request as-is (GET when no body, POST/JSON when body present)
-- **Send Encrypted button** — encrypt query string and body, then fire the request
+Postman-style request builder: a `[method ▾] [ URL ] [Send ▾]` request line above a tab bar (Params · Authorization · Headers · Body) with a decrypting response viewer below.
+- **Request line** — HTTP method dropdown (GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS), URL field, and two Send buttons side by side
+- **Send Encrypted / Send Plain buttons** — green **Send Encrypted** (AES-encrypt the query string and body first) and purple **Send Plain** (send as-is), shown side by side
+- **📋 Copy menu** — on the response meta line; copies what was actually **sent** (encrypted, when Send Encrypted was used): **URL**, **Body**, **Headers**, **as cURL**, or the **Response** body
+- **Method auto-bump** — typing a body while the method is GET bumps it to POST so bodies aren't silently dropped (GET/HEAD never carry a body)
+- **Params tab** — Postman-style query editor (enable checkbox · Key · Value · Description), two-way bound to the URL
+- **Authorization tab** — No Auth / Bearer Token; the token is sent as `Authorization` as-is (prepended with `Bearer ` if omitted), never encrypted
+- **Headers tab** — key/value/description editor for custom request headers, merged into the outgoing request (a header count shows on the tab)
+- **Body tab** — full-width raw (JSON) editor; `Content-Type: application/json` is added when a body is sent unless you set your own
+- **Tab indicators** — a green dot marks Params/Authorization/Body when they hold content, matching Postman
+- **Bulk Edit** — each table (Params, Headers) toggles to a `key:value`-per-line textarea; prefix a line with `//` to disable it
+- **Round-trip encryption** — encrypted query strings (`path?<ciphertext>`) round-trip with the decrypt path
 - **Unencrypted response passthrough** — when a sent request's response can't be decrypted, it's shown as plain raw output (not flagged as a decrypt error), since that's the expected result for a plaintext response
 - **Preview on unencrypted responses** — the Preview table is available even when the response wasn't encrypted, as long as the raw body itself is valid JSON
+- **Saved with the request** — Collections and History round-trip the method, headers, and auth alongside the URL/body/token
 
 ## Filtering
 - **Custom filter mini-language** — search by method, status, domain, host, scheme, mime-type, protocol, size, headers, running state, cache status, encryption state, API name

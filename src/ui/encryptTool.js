@@ -24,17 +24,50 @@ els.encryptToggle.addEventListener("click", () => {
   showView(open ? "encrypt" : "network");
   if (open) renderParamsFromUrl();
 });
+
+/* ---- Request line: method + URL + Send Encrypted / Send Plain buttons ---- */
+// Two side-by-side buttons: green Send Encrypted (AES-encrypt the query/body
+// first) and purple Send Plain (send exactly as entered).
 els.sendEncryptBtn.addEventListener("click", () => sendRequest("encrypt"));
-els.sendDecryptBtn.addEventListener("click", () => sendRequest("decrypt"));
+els.sendPlainBtn.addEventListener("click", () => sendRequest("decrypt"));
+
+// Typing a body implies a request that carries one: bump GET → POST (only from
+// GET, never overriding an explicit PUT/PATCH/…) so bodies aren't silently dropped.
+els.encMethod.addEventListener("change", () => { checkDirty(); updateReqTabIndicators(); });
+els.encBody.addEventListener("input", () => {
+  if (els.encBody.value.trim() !== "" && els.encMethod.value === "GET") els.encMethod.value = "POST";
+  checkDirty();
+  updateReqTabIndicators();
+});
+
 // Live Postman-style Query Params: parse the URL's query into an editable table.
 els.encUrl.addEventListener("input", renderParamsFromUrl);
+
+/* ---- Request tabs (Params / Authorization / Headers / Body) ---- */
+els.reqTabs.addEventListener("click", (e) => {
+  const btn = e.target.closest(".req-tab");
+  if (btn) setReqTab(btn.dataset.rtab);
+});
+function setReqTab(name) {
+  for (const b of els.reqTabs.querySelectorAll(".req-tab")) b.classList.toggle("active", b.dataset.rtab === name);
+  for (const p of els.reqPanels.querySelectorAll(".req-panel")) p.hidden = p.dataset.panel !== name;
+}
+
+/* ---- Authorization: No Auth / Bearer Token ---- */
+function syncAuthUi() { els.authTokenField.hidden = els.authType.value !== "bearer"; }
+els.authType.addEventListener("change", () => { syncAuthUi(); checkDirty(); updateReqTabIndicators(); });
+els.encToken.addEventListener("input", () => { checkDirty(); updateReqTabIndicators(); });
+
+/* ---- Bulk Edit toggles for the Params / Headers tables ---- */
+els.reqPanels.addEventListener("click", (e) => {
+  const b = e.target.closest(".bulk-toggle");
+  if (b) toggleBulk(b.dataset.bulk, b);
+});
+
 els.encryptClear.addEventListener("click", () => {
-  els.encUrl.value = "";
-  els.encBody.value = "";
-  els.encToken.value = "";
+  setReq({});
   els.encResponse.hidden = true;
   els.encResponse.innerHTML = "";
-  renderParamsFromUrl(); // clears + hides the params table
   currentRef = null;     // no longer editing a saved request
   checkDirty();
   closePanels();
@@ -42,12 +75,13 @@ els.encryptClear.addEventListener("click", () => {
 });
 
 /* ------------------------------ collections ------------------------------ */
-// Folders of saved requests: { folderName: { apiName: { url, body, token } } }.
-// The toolbar's 📚 Collection (browse tree) and ➕ Add (save new) buttons drive
-// this; 💾 Save appears when a loaded request is modified so you can update it.
+// Folders of saved requests: { folderName: { apiName: <snapshot()> } }, where a
+// snapshot is { url, method, body, token, authType, headers }. The toolbar's
+// 📚 Collection (browse tree) and ➕ Add (save new) buttons drive this; 💾 Save
+// appears when a loaded request is modified so you can update it.
 let collections = {};
 let currentRef = null;      // { folder, name } of the loaded/saved request, or null
-let currentSnapshot = null; // { url, body, token } captured at load/save time
+let currentSnapshot = null; // snapshot() captured at load/save time (for dirty checks)
 
 // Write collections to chrome.storage *and* mirror them to the backup file (a
 // no-op when none is linked). Every mutation below goes through here so the file
@@ -57,17 +91,40 @@ function persistCollections(cb) {
   backup.scheduleWrite(collections, history);
 }
 
+// The full request state a collection entry / history load round-trips through.
 function snapshot() {
-  return { url: els.encUrl.value, body: els.encBody.value, token: els.encToken.value };
+  return {
+    url: els.encUrl.value,
+    method: els.encMethod.value,
+    body: els.encBody.value,
+    token: els.encToken.value,
+    authType: els.authType.value,
+    headers: getHeaders(),
+  };
 }
 function sameSnapshot(a, b) {
-  return !!a && !!b && a.url === b.url && a.body === b.body && a.token === b.token;
+  return !!a && !!b && JSON.stringify(a) === JSON.stringify(b);
 }
+// Load a saved/blank request into every field, tolerating pre-2.17 entries that
+// only stored { url, body, token } (method/auth/headers are then derived).
+function setReq(r) {
+  r = r || {};
+  els.encUrl.value = r.url || "";
+  els.encBody.value = r.body || "";
+  els.encToken.value = r.token || "";
+  els.encMethod.value = VALID_METHODS.has(r.method) ? r.method : ((r.body || "").trim() ? "POST" : "GET");
+  els.authType.value = r.authType || (r.token ? "bearer" : "none");
+  setHeaders(r.headers || []);
+  renderParamsFromUrl();
+  syncAuthUi();
+  updateReqTabIndicators();
+}
+const VALID_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]);
 // Show 💾 Save only when a saved request is loaded AND has been modified.
 function checkDirty() {
   els.saveReqBtn.hidden = !(currentRef && !sameSnapshot(snapshot(), currentSnapshot));
 }
-[els.encUrl, els.encBody, els.encToken].forEach((elm) => elm.addEventListener("input", checkDirty));
+els.encUrl.addEventListener("input", checkDirty);
 
 function closePanels() {
   els.addPanel.hidden = true;
@@ -99,6 +156,7 @@ els.addCancelBtn.addEventListener("click", () => { els.addPanel.hidden = true; }
 els.addSaveBtn.addEventListener("click", () => {
   const name = els.addName.value.trim();
   if (!name) { flashEnc("Enter an API name.", true); return; }
+  applyOpenBulk(); // fold any open Bulk Edit box back into the tables first
   const folder = els.addNewFolder.value.trim() || els.addFolder.value || "Default";
   if (!collections[folder]) collections[folder] = {};
   collections[folder][name] = snapshot();
@@ -112,6 +170,7 @@ els.addSaveBtn.addEventListener("click", () => {
 /* ---- 💾 Save: update the currently-loaded request in place ---- */
 els.saveReqBtn.addEventListener("click", () => {
   if (!currentRef) return;
+  applyOpenBulk();
   if (!collections[currentRef.folder]) collections[currentRef.folder] = {};
   collections[currentRef.folder][currentRef.name] = snapshot();
   persistCollections((err) => flashEnc(err ? `Save failed: ${err}` : `Updated “${currentRef.name}” ✓`, !!err));
@@ -268,10 +327,8 @@ function renderHistoryPanel() {
     });
     row.appendChild(del);
     row.addEventListener("click", () => {
-      els.encUrl.value = h.url || "";
-      els.encBody.value = h.body || "";
-      els.encToken.value = h.token || "";
-      renderParamsFromUrl();
+      // History is a lightweight log (no saved headers), so load what it has.
+      setReq({ url: h.url, method: h.method, body: h.body, token: h.token });
       currentRef = null; // loading history doesn't attach it to a saved collection entry
       currentSnapshot = null;
       checkDirty();
@@ -393,10 +450,7 @@ function renameApi(folder, name) {
 function loadApi(folder, name) {
   const r = collections[folder] && collections[folder][name];
   if (!r) return;
-  els.encUrl.value = r.url || "";
-  els.encBody.value = r.body || "";
-  els.encToken.value = r.token || "";
-  renderParamsFromUrl();
+  setReq(r);
   currentRef = { folder, name };
   currentSnapshot = snapshot();
   checkDirty();
@@ -433,8 +487,9 @@ function parseQueryPairs(query) {
   }
   return pairs;
 }
-// One editable row: [enable] Key | Value | Description | [remove].
-function makeParamRow(key = "", value = "", enabled = true) {
+// One editable row: [enable] Key | Value | Description | [remove]. Shared by the
+// Query Params and Request Headers tables (they differ only in what an edit does).
+function makeKvRow(key, value, desc, enabled, onRemove) {
   const row = el("div", "ep-row");
   const enWrap = el("span", "ep-col-enable");
   const en = el("input", "ep-enable");
@@ -452,23 +507,36 @@ function makeParamRow(key = "", value = "", enabled = true) {
   const actWrap = el("span", "ep-col-act");
   const rm = el("button", "ep-remove", "✕");
   rm.type = "button";
-  rm.title = "Remove parameter";
-  rm.addEventListener("click", () => { row.remove(); syncUrlFromParams(); });
+  rm.title = "Remove";
+  rm.addEventListener("click", () => onRemove(row));
   actWrap.appendChild(rm);
-  row.append(enWrap, mk("ep-key", "Key", key), mk("ep-value", "Value", value), mk("ep-desc", "Description", ""), actWrap);
+  row.append(enWrap, mk("ep-key", "Key", key), mk("ep-value", "Value", value), mk("ep-desc", "Description", desc), actWrap);
   return row;
 }
+function makeParamRow(key = "", value = "", enabled = true) {
+  return makeKvRow(key, value, "", enabled, (row) => { row.remove(); syncUrlFromParams(); });
+}
+function makeHeaderRow(key = "", value = "", enabled = true) {
+  return makeKvRow(key, value, "", enabled, (row) => { row.remove(); onHeadersChanged(); });
+}
+// Keep one empty trailing row (Postman-style) so there's always somewhere to type.
+function ensureTrailing(bodyEl, makeRow) {
+  const rows = [...bodyEl.querySelectorAll(".ep-row")];
+  const last = rows[rows.length - 1];
+  if (!last) { bodyEl.appendChild(makeRow()); return; }
+  const used = last.querySelector(".ep-key").value !== "" || last.querySelector(".ep-value").value !== "";
+  if (used) bodyEl.appendChild(makeRow());
+}
+
 // Rebuild the params table from the URL's query (URL is the source of truth when
 // the user edits the URL text directly).
 function renderParamsFromUrl() {
-  const url = els.encUrl.value;
   els.encParamsBody.innerHTML = "";
-  if (!url.trim()) { els.encParams.hidden = true; return; }
-  els.encParams.hidden = false;
-  for (const p of parseQueryPairs(urlBaseQuery(url).query)) {
+  for (const p of parseQueryPairs(urlBaseQuery(els.encUrl.value).query)) {
     els.encParamsBody.appendChild(makeParamRow(p.key, p.value, true));
   }
   els.encParamsBody.appendChild(makeParamRow()); // trailing "add" row
+  updateReqTabIndicators();
 }
 // Rebuild the URL's query from the table (the table is the source of truth while
 // the user edits params); keeps one empty trailing row like Postman.
@@ -485,18 +553,107 @@ function syncUrlFromParams() {
     .join("&");
   const { base } = urlBaseQuery(els.encUrl.value);
   els.encUrl.value = base + (query ? "?" + query : "");
-  ensureTrailingRow();
+  ensureTrailing(els.encParamsBody, () => makeParamRow());
   checkDirty(); // editing params changes the URL → maybe mark the request dirty
-}
-function ensureTrailingRow() {
-  const rows = [...els.encParamsBody.querySelectorAll(".ep-row")];
-  const last = rows[rows.length - 1];
-  if (!last) { els.encParamsBody.appendChild(makeParamRow()); return; }
-  const used = last.querySelector(".ep-key").value !== "" || last.querySelector(".ep-value").value !== "";
-  if (used) els.encParamsBody.appendChild(makeParamRow());
+  updateReqTabIndicators();
 }
 els.encParamsBody.addEventListener("input", syncUrlFromParams);
 els.encParamsBody.addEventListener("change", syncUrlFromParams);
+
+/* ---- Request Headers table (Postman-style key/value editor) ---- */
+// The enabled, keyed rows are merged into the outgoing request's headers.
+function getHeaders() {
+  return [...els.encHeadersBody.querySelectorAll(".ep-row")]
+    .map((r) => ({
+      key: r.querySelector(".ep-key").value,
+      value: r.querySelector(".ep-value").value,
+      enabled: r.querySelector(".ep-enable").checked,
+    }))
+    .filter((h) => h.key !== "" || h.value !== ""); // drop the empty trailing row
+}
+function setHeaders(list) {
+  els.encHeadersBody.innerHTML = "";
+  for (const h of list) els.encHeadersBody.appendChild(makeHeaderRow(h.key, h.value, h.enabled !== false));
+  els.encHeadersBody.appendChild(makeHeaderRow()); // trailing "add" row
+}
+function onHeadersChanged() {
+  ensureTrailing(els.encHeadersBody, () => makeHeaderRow());
+  checkDirty();
+  updateReqTabIndicators();
+}
+els.encHeadersBody.addEventListener("input", onHeadersChanged);
+els.encHeadersBody.addEventListener("change", onHeadersChanged);
+
+/* ---- Tab indicators: green dots / a header count, like Postman ---- */
+function updateReqTabIndicators() {
+  const setDot = (name, on) => {
+    const d = els.reqTabs.querySelector(`[data-dot="${name}"]`);
+    if (d) d.hidden = !on;
+  };
+  setDot("params", [...els.encParamsBody.querySelectorAll(".ep-row")]
+    .some((r) => r.querySelector(".ep-enable").checked && r.querySelector(".ep-key").value.trim() !== ""));
+  setDot("auth", els.authType.value === "bearer" && els.encToken.value.trim() !== "");
+  setDot("body", els.encBody.value.trim() !== "");
+  const n = getHeaders().filter((h) => h.enabled && h.key.trim() !== "").length;
+  const cnt = els.reqTabs.querySelector('[data-count="headers"]');
+  if (cnt) { cnt.hidden = n === 0; cnt.textContent = String(n); }
+}
+
+/* ---- Bulk Edit: swap either table for a key:value-per-line textarea ---- */
+// A "//" prefix on a line marks it disabled — matching Postman's bulk editor.
+function rowsToBulk(bodyEl) {
+  return [...bodyEl.querySelectorAll(".ep-row")]
+    .map((r) => ({ on: r.querySelector(".ep-enable").checked, key: r.querySelector(".ep-key").value, value: r.querySelector(".ep-value").value }))
+    .filter((p) => p.key !== "" || p.value !== "")
+    .map((p) => (p.on ? "" : "//") + p.key + ":" + p.value)
+    .join("\n");
+}
+function bulkToRows(text) {
+  const out = [];
+  for (const raw of text.split("\n")) {
+    let line = raw.trim();
+    if (line === "") continue;
+    let on = true;
+    if (line.startsWith("//")) { on = false; line = line.slice(2).trim(); }
+    const i = line.indexOf(":");
+    const key = (i === -1 ? line : line.slice(0, i)).trim();
+    const value = (i === -1 ? "" : line.slice(i + 1)).trim();
+    if (key === "" && value === "") continue;
+    out.push({ key, value, on });
+  }
+  return out;
+}
+function toggleBulk(name, btn) {
+  const isParams = name === "params";
+  const grid = isParams ? els.encParams : els.encHeaders;
+  const area = isParams ? els.paramsBulk : els.headersBulk;
+  const bodyEl = isParams ? els.encParamsBody : els.encHeadersBody;
+  const makeRow = isParams
+    ? (r) => makeParamRow(r ? r.key : "", r ? r.value : "", r ? r.on : true)
+    : (r) => makeHeaderRow(r ? r.key : "", r ? r.value : "", r ? r.on : true);
+  if (area.hidden) {
+    area.value = rowsToBulk(bodyEl);
+    grid.hidden = true;
+    area.hidden = false;
+    btn.textContent = "Key-Value Edit";
+  } else {
+    bodyEl.innerHTML = "";
+    for (const r of bulkToRows(area.value)) bodyEl.appendChild(makeRow(r));
+    bodyEl.appendChild(makeRow());
+    area.hidden = true;
+    grid.hidden = false;
+    btn.textContent = "Bulk Edit";
+    if (isParams) syncUrlFromParams(); else onHeadersChanged();
+  }
+}
+// Fold any open Bulk Edit box back into its table (called before send/save so the
+// tables — the source of truth — reflect what's on screen).
+function applyOpenBulk() {
+  for (const btn of els.reqPanels.querySelectorAll(".bulk-toggle")) {
+    const area = btn.dataset.bulk === "params" ? els.paramsBulk : els.headersBulk;
+    if (!area.hidden) toggleBulk(btn.dataset.bulk, btn);
+  }
+}
 
 function flashEnc(msg, isErr) {
   els.encStatus.textContent = msg;
@@ -527,20 +684,24 @@ function reasonPhrase(code) {
 
 // mode "encrypt": encrypt the query string + body first, then send.
 // mode "decrypt": send the URL/body exactly as entered (no encryption).
-// The Bearer Token is always sent as-is in the Authorization header.
+// The chosen HTTP method, custom Headers and Bearer Token are all applied as-is.
 async function sendRequest(mode) {
+  applyOpenBulk(); // fold any open Bulk Edit box back into the tables first
   const rawUrl = els.encUrl.value.trim();
   const rawBody = els.encBody.value;
   const token = els.encToken.value.trim();
+  const method = els.encMethod.value;
   els.encResponse.hidden = true;
   els.encResponse.innerHTML = "";
 
   if (!rawUrl) { flashEnc("Enter a URL to send.", true); return; }
 
+  // GET/HEAD requests can't carry a body (fetch throws), so drop it there.
+  const methodAllowsBody = method !== "GET" && method !== "HEAD";
   const { base, query } = splitUrlForEncrypt(rawUrl);
   const willEncryptQuery = base != null && query.trim() !== "";
-  const willEncryptBody = rawBody.trim() !== "";
-  if (mode === "encrypt" && (willEncryptQuery || willEncryptBody) && !state.key) {
+  const willSendBody = methodAllowsBody && rawBody.trim() !== "";
+  if (mode === "encrypt" && (willEncryptQuery || willSendBody) && !state.key) {
     flashEnc("Set the AES key in 🔑 Key first.", true);
     return;
   }
@@ -550,22 +711,27 @@ async function sendRequest(mode) {
   try {
     if (mode === "encrypt") {
       if (willEncryptQuery) url = base + "?" + (await CipherNetCrypto.encrypt(query, state.key, state.iv));
-      if (willEncryptBody) body = await CipherNetCrypto.encrypt(rawBody, state.key, state.iv);
+      if (willSendBody) body = await CipherNetCrypto.encrypt(rawBody, state.key, state.iv);
     }
   } catch (e) {
     flashEnc(e.message || "Encryption failed.", true);
     return;
   }
 
-  const method = body.trim() !== "" ? "POST" : "GET";
+  // Custom headers first, then auth + Content-Type (unless the user set their own).
   const headers = {};
-  if (token) headers["Authorization"] = /^bearer\s/i.test(token) ? token : "Bearer " + token;
-  if (method === "POST") headers["Content-Type"] = "application/json";
+  for (const h of getHeaders()) if (h.enabled && h.key.trim() !== "") headers[h.key.trim()] = h.value;
+  if (els.authType.value === "bearer" && token) {
+    headers["Authorization"] = /^bearer\s/i.test(token) ? token : "Bearer " + token;
+  }
+  if (willSendBody && !Object.keys(headers).some((k) => k.toLowerCase() === "content-type")) {
+    headers["Content-Type"] = "application/json";
+  }
 
   flashEnc("Sending…");
   const started = performance.now();
   try {
-    const resp = await fetch(url, { method, headers, body: method === "POST" ? body : undefined });
+    const resp = await fetch(url, { method, headers, body: willSendBody ? body : undefined });
     const text = await resp.text();
     // Decrypt the response body up front (auto-lenient on failure) so switching
     // response tabs / history is instant.
@@ -573,6 +739,9 @@ async function sendRequest(mode) {
     const decRes = text ? await CipherNetCrypto.tryDecryptAuto(candidates, state.key, state.iv) : null;
     const entry = {
       method, url,
+      // What was actually sent (encrypted, when Send Encrypted) — for the Copy menu.
+      reqBody: willSendBody ? body : "",
+      reqHeaders: headers,
       status: resp.status,
       statusText: resp.statusText,
       timeMs: Math.round(performance.now() - started),
@@ -614,6 +783,7 @@ function renderResponseView(entry) {
   meta.appendChild(el("span", "resp-dim", fmtTime(entry.timeMs)));
   meta.appendChild(el("span", "resp-dim", fmtSize(entry.size)));
   meta.appendChild(el("span", "resp-dim", `${entry.method} ${entry.url}`));
+  meta.appendChild(respCopyControl(entry)); // 📋 Copy the sent URL / body / headers
   els.encResponse.appendChild(meta);
 
   const tabs = el("div", "resp-tabs");
@@ -637,6 +807,62 @@ function renderResponseView(entry) {
   else if (respTab === "history") content.appendChild(respHistory(entry));
   else content.appendChild(respBody(entry));
 }
+
+/* ---- 📋 Copy: grab what was actually sent (encrypted, on Send Encrypted) ---- */
+function reqHeadersToText(h) {
+  h = h || {};
+  return Object.keys(h).map((k) => `${k}: ${h[k]}`).join("\n");
+}
+function curlText(entry) {
+  const parts = [`curl -X ${entry.method} '${entry.url}'`];
+  const h = entry.reqHeaders || {};
+  for (const k of Object.keys(h)) parts.push(`-H '${k}: ${h[k]}'`);
+  if (entry.reqBody) parts.push(`--data '${entry.reqBody}'`);
+  return parts.join(" \\\n  ");
+}
+// A "📋 Copy ▾" dropdown for the response meta line: URL / Body / Headers / cURL /
+// Response. Each item copies the sent request (encrypted when Send Encrypted was used).
+function respCopyControl(entry) {
+  const wrap = el("div", "menu-wrap resp-copy-wrap");
+  const btn = el("button", "resp-copy", "📋 Copy ▾");
+  btn.type = "button";
+  btn.title = "Copy the sent request (encrypted, when Send Encrypted)";
+  const menu = el("div", "menu resp-copy-menu");
+  menu.hidden = true;
+  const items = [
+    ["URL", () => entry.url],
+    ["Body", () => entry.reqBody],
+    ["Headers", () => reqHeadersToText(entry.reqHeaders)],
+    ["as cURL", () => curlText(entry)],
+    ["Response", () => entry.body],
+  ];
+  for (const [label, get] of items) {
+    const item = el("button", null, "Copy " + label);
+    item.type = "button";
+    item.addEventListener("click", (e) => {
+      e.stopPropagation();
+      menu.hidden = true;
+      const text = get() || "";
+      if (!text) { flashEnc(`Nothing to copy for ${label}.`, true); return; }
+      navigator.clipboard.writeText(text)
+        .then(() => flashEnc(`Copied ${label} ✓`))
+        .catch(() => flashEnc("Copy failed.", true));
+    });
+    menu.appendChild(item);
+  }
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    els.encResponse.querySelectorAll(".resp-copy-menu").forEach((m) => { if (m !== menu) m.hidden = true; });
+    menu.hidden = !menu.hidden;
+  });
+  wrap.append(btn, menu);
+  return wrap;
+}
+// Close any open Copy menu when clicking elsewhere.
+document.addEventListener("click", (e) => {
+  if (e.target.closest && e.target.closest(".resp-copy-wrap")) return;
+  els.encResponse.querySelectorAll(".resp-copy-menu").forEach((m) => (m.hidden = true));
+});
 
 // Body tab: reuses bodyView (decrypted text when it decrypts, raw + reason when
 // not), with a note when the decrypt was lenient / best-effort. When decryption
@@ -700,3 +926,8 @@ function respHistory(current) {
   }
   return list;
 }
+
+/* --------------------------- initialise the tester --------------------------- */
+// Seed both tables' trailing rows / the auth UI so the panel is ready before
+// it's ever opened.
+setReq({});

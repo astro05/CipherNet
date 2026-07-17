@@ -17,18 +17,32 @@ export const els = {
   saveKey: document.getElementById("saveKey"),
   resetKey: document.getElementById("resetKey"),
   keyStatus: document.getElementById("keyStatus"),
-  // encrypt-url tool
+  // API Testing tool (Postman-style request builder)
   encryptToggle: document.getElementById("encryptToggle"),
   encryptRow: document.getElementById("encryptRow"),
+  encMethod: document.getElementById("encMethod"),
   encUrl: document.getElementById("encUrl"),
   encBody: document.getElementById("encBody"),
   encryptClear: document.getElementById("encryptClear"),
   encStatus: document.getElementById("encStatus"),
+  // request line: two Send buttons (Encrypted / Plain), side by side
+  sendEncryptBtn: document.getElementById("sendEncryptBtn"),
+  sendPlainBtn: document.getElementById("sendPlainBtn"),
+  // request tabs + panels
+  reqTabs: document.getElementById("reqTabs"),
+  reqPanels: document.getElementById("reqPanels"),
+  // Params tab
   encParams: document.getElementById("encParams"),
   encParamsBody: document.getElementById("encParamsBody"),
+  paramsBulk: document.getElementById("paramsBulk"),
+  // Authorization tab
+  authType: document.getElementById("authType"),
+  authTokenField: document.getElementById("authTokenField"),
   encToken: document.getElementById("encToken"),
-  sendEncryptBtn: document.getElementById("sendEncryptBtn"),
-  sendDecryptBtn: document.getElementById("sendDecryptBtn"),
+  // Headers tab
+  encHeaders: document.getElementById("encHeaders"),
+  encHeadersBody: document.getElementById("encHeadersBody"),
+  headersBulk: document.getElementById("headersBulk"),
   encResponse: document.getElementById("encResponse"),
   // collections: toolbar tools (Collection / Add / Save) + their pop-panels
   encTools: document.getElementById("encTools"),

@@ -265,7 +265,6 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .enc-inputs { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
 .enc-field { display: flex; flex-direction: column; gap: 2px; }
 .enc-field > span { color: var(--muted); font-size: 11px; }
-#encUrl { width: 360px; font-family: Consolas, monospace; }
 .enc-field textarea {
   background: var(--bg);
   color: var(--fg);
@@ -283,6 +282,89 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .enc-inputs input, .enc-inputs textarea { height: 26px; min-height: 26px; }
 /* Action buttons sit beside the Bearer Token box, aligned to its bottom edge. */
 .enc-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; align-self: flex-end; padding-bottom: 1px; }
+
+/* ---------- Postman-style request builder (API Testing view) ---------- */
+/* Request line: [method ▾][ URL ] joined, then two Send buttons side by side. */
+.req-line { display: flex; align-items: stretch; width: 100%; gap: 8px; }
+.url-group { display: flex; flex: 1 1 auto; min-width: 0; }
+#toolbar .req-method {
+  flex: 0 0 auto;
+  border-radius: 4px 0 0 4px;
+  border-right: none;
+  background: var(--bg3);
+  color: var(--post);
+  font-weight: 600;
+  font-family: Consolas, monospace;
+}
+#toolbar #encUrl {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-radius: 0 4px 4px 0;
+  font-family: Consolas, monospace;
+}
+/* Send Encrypted (green) + Send Plain (purple) — solid fills, white text. */
+#toolbar .req-send {
+  flex: 0 0 auto;
+  border-radius: 4px;
+  padding: 3px 16px;
+  color: #fff;
+  font-weight: 600;
+}
+#toolbar .req-send-enc { background: #16a34a; border-color: #16a34a; }
+#toolbar .req-send-plain { background: #7c3aed; border-color: #7c3aed; }
+/* Keep the brand fill on hover (the generic #toolbar button:hover would repaint
+   it near-white and hide the white text) — just brighten it a touch. */
+#toolbar .req-send-enc:hover { background: #16a34a; border-color: #16a34a; filter: brightness(1.12); }
+#toolbar .req-send-plain:hover { background: #7c3aed; border-color: #7c3aed; filter: brightness(1.12); }
+
+/* Request tab bar (Params / Authorization / Headers / Body). */
+.req-tabs { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+#toolbar .req-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+#toolbar .req-tab:hover { background: transparent; color: var(--fg); }
+#toolbar .req-tab.active { background: transparent; color: var(--fg); border-bottom-color: var(--accent); }
+.req-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+.req-dot[hidden] { display: none; }
+.req-count { background: var(--bg3); color: var(--muted); border-radius: 8px; padding: 0 6px; font-size: 10px; line-height: 15px; }
+.req-count[hidden] { display: none; }
+.req-tabs-spacer { flex: 1 1 auto; }
+
+/* Tab panels + the per-tab header (title + Bulk Edit link). */
+.req-panel[hidden] { display: none; }
+.req-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.bulk-area {
+  width: 100%;
+  min-height: 120px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  resize: vertical;
+  font-family: Consolas, monospace;
+}
+.bulk-area[hidden] { display: none; }
+
+/* Authorization tab. */
+.auth-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; }
+.auth-type { display: flex; flex-direction: column; gap: 2px; }
+.auth-type > span { color: var(--muted); font-size: 11px; }
+.auth-token { flex: 1 1 340px; }
+.auth-token[hidden] { display: none; }
+.auth-token textarea { width: 100%; height: 26px; min-height: 26px; }
+
+/* Body tab — a full-width, multi-line raw editor. */
+.enc-field-body { width: 100%; }
+.enc-field-body textarea { width: 100%; min-height: 120px; }
 
 /* collection tools live in the toolbar; display:contents lets them flow in the
    flex row, and they're shown only in the API Testing view. */
@@ -398,14 +480,10 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 }
 .ep-remove:hover { color: var(--err); }
 
-/* API Testing drawer action buttons — fixed brand colors (solid fill, white text).
-   The #toolbar #id selectors outrank #toolbar button / .ghost so the fills win. */
-#toolbar #encryptClear   { background: #6b7280; border-color: #6b7280; color: #fff; }
-#toolbar #sendEncryptBtn { background: #16a34a; border-color: #16a34a; color: #fff; }
-#toolbar #sendDecryptBtn { background: #7c3aed; border-color: #7c3aed; color: #fff; }
-#toolbar #encryptClear:hover,
-#toolbar #sendEncryptBtn:hover,
-#toolbar #sendDecryptBtn:hover { filter: brightness(1.12); }
+/* API Testing drawer Clear button — fixed gray (the split Send button styles
+   live with the request line above). */
+#toolbar #encryptClear { background: #6b7280; border-color: #6b7280; color: #fff; }
+#toolbar #encryptClear:hover { filter: brightness(1.12); }
 
 /* Encrypt/Decrypt drawer action buttons — encrypt = blue, decrypt = purple,
    clear = gray (matches the API Testing drawer scheme). */
@@ -452,6 +530,13 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .resp-status.bad { color: var(--err); }
 .resp-dim { color: var(--muted); word-break: break-all; }
 .resp-bar { display: flex; gap: 6px; }
+
+/* 📋 Copy dropdown on the response meta line (URL / Body / Headers / cURL / Response) */
+.resp-copy-wrap { margin-left: auto; flex: 0 0 auto; }
+#toolbar .resp-copy { padding: 2px 8px; font-family: inherit; }
+/* Anchor to the button's right edge so the menu opens inward (it sits far right). */
+.resp-copy-menu { min-width: 150px; left: auto; right: 0; }
+.resp-copy-menu[hidden] { display: none; }
 
 /* response tabs (Body / Cookies / Headers / History) */
 .resp-tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--border); }

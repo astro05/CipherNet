@@ -110,28 +110,94 @@
         <span id="keyStatus" class="muted"></span>
       </div>
       <div class="tb-row encryptor" id="encryptRow">
-        <div class="enc-inputs">
-          <label class="enc-field"><span>URL</span><input id="encUrl" type="text" spellcheck="false" placeholder="https://api.company.com/path?foo=bar&amp;baz=1" /></label>
-          <label class="enc-field"><span>Payload / Body</span><textarea id="encBody" spellcheck="false" rows="1" placeholder='{"userId":42}'></textarea></label>
-          <label class="enc-field enc-field-token"><span>Bearer Token — not encrypted</span><textarea id="encToken" spellcheck="false" rows="1" placeholder="token (± &quot;Bearer &quot;)"></textarea></label>
-          <div class="enc-actions">
-            <button id="encryptClear" class="ghost">Clear</button>
-            <button id="sendEncryptBtn" title="Encrypt the query/body, then send the request">Send Encrypted</button>
-            <button id="sendDecryptBtn" title="Send the request as-is (no encryption)">Send Plain</button>
-            <span id="encStatus" class="muted"></span>
+        <!-- Request line: [method ▾][ URL ] then Send Encrypted / Send Plain. -->
+        <div class="req-line">
+          <div class="url-group">
+            <select id="encMethod" class="req-method" title="HTTP method">
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+              <option value="PATCH">PATCH</option>
+              <option value="DELETE">DELETE</option>
+              <option value="HEAD">HEAD</option>
+              <option value="OPTIONS">OPTIONS</option>
+            </select>
+            <input id="encUrl" class="req-url" type="text" spellcheck="false" placeholder="Enter request URL — e.g. https://api.company.com/path?foo=bar" />
           </div>
+          <button id="sendEncryptBtn" class="req-send req-send-enc" title="Encrypt the query string and body, then send">Send Encrypted</button>
+          <button id="sendPlainBtn" class="req-send req-send-plain" title="Send the request exactly as entered (no encryption)">Send Plain</button>
         </div>
-        <div id="encParams" class="enc-params" hidden>
-          <span class="enc-params-title">Query Params</span>
-          <div class="enc-params-grid">
-            <div class="ep-row ep-head">
-              <span class="ep-col-enable"></span>
-              <span>Key</span>
-              <span>Value</span>
-              <span>Description</span>
-              <span class="ep-col-act"></span>
+        <!-- Request tab bar: Params / Authorization / Headers / Body (Postman-style). -->
+        <div class="req-tabs" id="reqTabs">
+          <button class="req-tab active" data-rtab="params" type="button">Params<span class="req-dot" data-dot="params" hidden></span></button>
+          <button class="req-tab" data-rtab="auth" type="button">Authorization<span class="req-dot" data-dot="auth" hidden></span></button>
+          <button class="req-tab" data-rtab="headers" type="button">Headers<span class="req-count" data-count="headers" hidden></span></button>
+          <button class="req-tab" data-rtab="body" type="button">Body<span class="req-dot" data-dot="body" hidden></span></button>
+          <span class="req-tabs-spacer"></span>
+          <button id="encryptClear" class="ghost" type="button">Clear</button>
+          <span id="encStatus" class="muted"></span>
+        </div>
+        <!-- Tab panels. -->
+        <div class="req-panels" id="reqPanels">
+          <!-- Params -->
+          <div class="req-panel" data-panel="params">
+            <div class="req-panel-head">
+              <span class="enc-params-title">Query Params</span>
+              <button class="linkbtn bulk-toggle" data-bulk="params" type="button">Bulk Edit</button>
             </div>
-            <div id="encParamsBody"></div>
+            <div id="encParams" class="enc-params">
+              <div class="enc-params-grid">
+                <div class="ep-row ep-head">
+                  <span class="ep-col-enable"></span>
+                  <span>Key</span>
+                  <span>Value</span>
+                  <span>Description</span>
+                  <span class="ep-col-act"></span>
+                </div>
+                <div id="encParamsBody"></div>
+              </div>
+            </div>
+            <textarea id="paramsBulk" class="bulk-area" spellcheck="false" hidden placeholder="key:value per line — prefix a line with // to disable it"></textarea>
+          </div>
+          <!-- Authorization -->
+          <div class="req-panel" data-panel="auth" hidden>
+            <div class="auth-row">
+              <label class="auth-type"><span>Type</span>
+                <select id="authType">
+                  <option value="none">No Auth</option>
+                  <option value="bearer">Bearer Token</option>
+                </select>
+              </label>
+              <label class="enc-field auth-token" id="authTokenField"><span>Token — sent as Authorization, not encrypted</span>
+                <textarea id="encToken" spellcheck="false" rows="1" placeholder="token (± &quot;Bearer &quot;)"></textarea>
+              </label>
+            </div>
+          </div>
+          <!-- Headers -->
+          <div class="req-panel" data-panel="headers" hidden>
+            <div class="req-panel-head">
+              <span class="enc-params-title">Request Headers</span>
+              <button class="linkbtn bulk-toggle" data-bulk="headers" type="button">Bulk Edit</button>
+            </div>
+            <div id="encHeaders" class="enc-params">
+              <div class="enc-params-grid">
+                <div class="ep-row ep-head">
+                  <span class="ep-col-enable"></span>
+                  <span>Key</span>
+                  <span>Value</span>
+                  <span>Description</span>
+                  <span class="ep-col-act"></span>
+                </div>
+                <div id="encHeadersBody"></div>
+              </div>
+            </div>
+            <textarea id="headersBulk" class="bulk-area" spellcheck="false" hidden placeholder="Header-Name: value per line — prefix a line with // to disable it"></textarea>
+          </div>
+          <!-- Body -->
+          <div class="req-panel" data-panel="body" hidden>
+            <label class="enc-field enc-field-body"><span>Raw body (JSON) — encrypted when sending encrypted</span>
+              <textarea id="encBody" spellcheck="false" rows="6" placeholder='{"userId":42}'></textarea>
+            </label>
           </div>
         </div>
         <div id="encResponse" class="enc-response" hidden></div>

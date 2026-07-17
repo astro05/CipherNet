@@ -1,4 +1,4 @@
-**Version:** 2.16.1 | **Last Modified:** 2026-07-17
+**Version:** 2.17.2 | **Last Modified:** 2026-07-18
 
 ![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)
@@ -83,27 +83,39 @@ to .NET's default — so round-trips match byte-for-byte.
   re-renders the open request live, and **auto-closes the Key box**. While no key
   is saved the **🔑 Key** button **blinks red** so it's obvious one is needed.
   **Clear** wipes the stored key (and starts the blink again).
-- **API Testing 🔒** — a Postman-style composer for **sending** CipherNet requests.
-  Enter a **URL** and/or a **Payload / Body**, then use **Send Encrypted** / **Send
-  Plain** below to fire the request. When the **URL** field holds a query string
-  it's broken out into a Postman-style **Query Params** table (enable checkbox ·
-  Key · Value · Description, with add/remove rows); editing the table rewrites the
-  URL and editing the URL rebuilds the table, so you can compose the query before
-  sending. Opening the tool hides the request list / detail view and the
-  resource-type filter row so you get a focused view; click **🌐 Network** (or
+- **API Testing 🔒** — a Postman-style composer for **sending** CipherNet requests. The
+  layout mirrors Postman: a request line — **`[method ▾] [ URL ] [Send ▾]`** — sits
+  above a tab bar (**Params · Authorization · Headers · Body**), with a decrypting
+  response viewer below. Opening the tool hides the request list / detail view and
+  the resource-type filter row so you get a focused view; click **🌐 Network** (or
   **🔒 API Testing** again) to bring the network view back. (To encrypt a value on
   its own — without sending — use **🔐 Encrypt/Decrypt**.)
-  - **Bearer Token** — a field beside Payload/Body for an `Authorization` token.
-    It is **never encrypted**; it's sent as-is (with `Bearer ` prepended if you
-    omit it) on the Send requests below.
-  - **Send Encrypted** / **Send Plain** — fire the request like Postman. **Send
-    Encrypted** encrypts the query string and body first, then sends; **Send
-    Plain** sends the URL/body exactly as entered. The method is `GET` when
-    there's no body, `POST` (JSON) when there is.
+  - **Send Encrypted / Send Plain** — two buttons side by side. **Send Encrypted**
+    (green) encrypts the query string and body first, then sends; **Send Plain**
+    (purple) sends the URL/body exactly as entered.
+  - **📋 Copy** — a dropdown on the response meta line that copies what was actually
+    **sent** (encrypted, when you used Send Encrypted): the **URL**, **Body**,
+    **Headers**, an equivalent **cURL** command, or the **Response** body.
+  - **Method** — GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS. Typing a body while the
+    method is GET bumps it to POST so bodies aren't dropped (GET/HEAD carry none).
+  - **Params tab** — a Postman-style **Query Params** table (enable checkbox · Key ·
+    Value · Description, with add/remove rows), two-way bound to the URL: editing the
+    table rewrites the URL and editing the URL rebuilds the table.
+  - **Authorization tab** — **No Auth** or **Bearer Token**. The token is **never
+    encrypted**; it's sent as-is as the `Authorization` header (with `Bearer `
+    prepended if you omit it).
+  - **Headers tab** — a key/value/description table of custom request headers merged
+    into the outgoing request (a count shows on the tab). `Content-Type:
+    application/json` is added automatically when a body is sent unless you set your own.
+  - **Body tab** — a full-width raw (JSON) editor; encrypted first on Send Encrypted.
+  - **Bulk Edit** — the Params and Headers tables each toggle to a `key:value`-per-line
+    textarea (prefix a line with `//` to disable it), matching Postman's bulk editor.
+  - **Tab indicators** — a green dot marks Params/Authorization/Body when they hold
+    content, like Postman.
   - **Collections (folders of saved requests)** — while the API Testing view is
     open, three tools appear in the toolbar after **🔐 Encrypt/Decrypt**:
     - **➕ Add** — opens a small panel to name the request (**API name**) and pick
-      or create a **folder**, then saves it (URL, body, token) locally.
+      or create a **folder**, then saves it (URL, method, headers, body, token) locally.
     - **📚 Collection** — a dropdown **tree** of every folder → API; click an API
       to load it, or use the **🗑** icon on any row to delete that folder (with
       its requests) or a single request.
