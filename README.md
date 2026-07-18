@@ -71,7 +71,7 @@ to .NET's default — so round-trips match byte-for-byte.
   - **Cookies** — parsed Request and Response (Set-Cookie) cookie tables.
   - **Initiator** — initiator type, URL, and JS call stack when available.
 - **Leading toolbar buttons** — right after the CipherNet icon sit the view
-  switchers: **🔑 Key**, **🌐 Network**, **🔒 API Testing** and **🔐 Encrypt/Decrypt**.
+  switchers: **🔑 Key**, **🌐 Network**, **🚀 API Testing** and **🔐 Encrypt/Decrypt**.
   **Network** is the default view (the request list + detail pane); the API
   Testing and Encrypt/Decrypt tools open in place of it, and **🌐 Network** (or clicking the
   active tool again) brings the list back. The network-only toolbar controls
@@ -83,12 +83,12 @@ to .NET's default — so round-trips match byte-for-byte.
   re-renders the open request live, and **auto-closes the Key box**. While no key
   is saved the **🔑 Key** button **blinks red** so it's obvious one is needed.
   **Clear** wipes the stored key (and starts the blink again).
-- **API Testing 🔒** — a Postman-style composer for **sending** CipherNet requests. The
+- **API Testing 🚀** — a Postman-style composer for **sending** CipherNet requests. The
   layout mirrors Postman: a request line — **`[method ▾] [ URL ] [Send ▾]`** — sits
   above a tab bar (**Params · Authorization · Headers · Body**), with a decrypting
   response viewer below. Opening the tool hides the request list / detail view and
   the resource-type filter row so you get a focused view; click **🌐 Network** (or
-  **🔒 API Testing** again) to bring the network view back. (To encrypt a value on
+  **🚀 API Testing** again) to bring the network view back. (To encrypt a value on
   its own — without sending — use **🔐 Encrypt/Decrypt**.)
   - **Send Encrypted / Send Plain** — two buttons side by side. **Send Encrypted**
     (green) encrypts the query string and body first, then sends; **Send Plain**
@@ -322,7 +322,7 @@ ui with a single composition root:
 | `src/ui/jsonTable.js`        | Sortable / filterable JSON table (Preview)           |
 | `src/ui/views.js`            | Network / API Testing / Encrypt/Decrypt view switcher |
 | `src/ui/keyBox.js`           | 🔑 Key box                                           |
-| `src/ui/encryptTool.js`      | 🔒 API Testing tool + Send Encrypted/Plain           |
+| `src/ui/encryptTool.js`      | 🚀 API Testing tool + Send Encrypted/Plain           |
 | `src/ui/decryptTool.js`      | 🔐 Encrypt/Decrypt tool (encrypt or decrypt a value)  |
 | `selftest.mjs`               | `node selftest.mjs` — verifies crypto vs. .NET       |
 

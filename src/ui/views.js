@@ -1,7 +1,7 @@
 // ui/views.js — the leading toolbar buttons switch the panel between three
 // mutually-exclusive views:
 //   - "network": the request list + detail pane (the default),
-//   - "encrypt": the 🔒 API Testing drawer,
+//   - "encrypt": the 🚀 API Testing drawer,
 //   - "decrypt": the 🔐 Encrypt/Decrypt drawer.
 // The Network panel is shown by default; encryptTool/decryptTool call showView
 // to open (or toggle back from) their drawers.

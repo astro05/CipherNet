@@ -1,4 +1,4 @@
-// ui/encryptTool.js — the 🔒 API Testing drawer: a Postman-style Query Params
+// ui/encryptTool.js — the 🚀 API Testing drawer: a Postman-style Query Params
 // editor two-way bound to the URL, plus Send Encrypted / Send Plain requests
 // (Send Encrypted AES-encrypts the query/body first) with a decrypting response
 // viewer. Encrypting a value on its own lives in the 🔐 Encrypt/Decrypt drawer.
