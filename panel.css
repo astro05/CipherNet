@@ -458,7 +458,7 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .pop-actions { display: flex; gap: 8px; margin-top: 4px; }
 
 /* Collection tree (folders → APIs) with per-row delete */
-.tree-panel { max-height: 340px; overflow: auto; min-width: 340px; padding: 4px; }
+.tree-panel { max-height: 340px; overflow: auto; min-width: 300px; padding: 4px; }
 .tree-folder { display: flex; align-items: center; gap: 6px; padding: 4px 4px; font-weight: 600; }
 .tree-api {
   display: flex;
@@ -476,14 +476,13 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .tree-rename, .tree-del { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 0 4px; font-size: 12px; line-height: 1; }
 .tree-rename:hover { color: var(--accent); }
 .tree-del:hover { color: var(--err); }
-.tree-rename.has-note { color: var(--accent); }
-/* per-request metadata controls in the collection tree (scoped to #toolbar so
-   they outrank the generic #toolbar button padding/border) */
+/* favorite star in the collection tree (scoped to #toolbar so it outranks the
+   generic #toolbar button padding/border) */
 #toolbar .tree-star { background: transparent; border: none; cursor: pointer; padding: 0 2px; font-size: 12px; line-height: 1; color: var(--muted); flex: 0 0 auto; }
 #toolbar .tree-star.on { color: #f59e0b; }
-#toolbar .tree-swatch { width: 12px; height: 12px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: transparent; cursor: pointer; flex: 0 0 auto; }
-.tree-tags { display: flex; gap: 3px; flex-wrap: wrap; flex: 0 1 auto; min-width: 0; overflow: hidden; }
-.tag-chip { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 0 6px; font-size: 10px; color: var(--muted); white-space: nowrap; }
+/* Collection filter box */
+.tree-search { width: 100%; margin-bottom: 6px; }
+.tree-list { display: flex; flex-direction: column; }
 #encStatus.err { color: var(--err); }
 
 /* Environments pop-panel ({{vars}} switcher + variable editor) */

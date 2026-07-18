@@ -1,4 +1,4 @@
-**Version:** 2.19.0 | **Last Modified:** 2026-07-18
+**Version:** 2.19.2 | **Last Modified:** 2026-07-18
 
 # Features
 
@@ -21,13 +21,10 @@
 - **Load request** — click any API in the tree to load it into the API Testing tool
 - **Rename folder** — rename a folder (with ✎ button)
 - **Rename request** — rename a saved API request (with ✎ button)
-- **Save button** — update a previously saved request after modifying it (its favorite/color/tags/note are preserved)
+- **Save button** — update a previously saved request after modifying it (its favorite is preserved)
 - **Save request** — persist requests and Bearer tokens via `chrome.storage.sync` (see **Backup & Restore** for surviving removal of the extension)
-- **Favorite ★** — star a request; favorites float to the top of their folder
-- **Colour tag** — click the swatch to cycle a colour; the request row gets a matching left border (triage at a glance)
-- **Tags** — attach comma-separated tags (🏷), shown as chips on the request row
-- **Note** — attach a free-text note (📝) to a request; shown on hover, indicator lights when present
-- **Rides along in backup** — favorite/colour/tags/note live inside the collection entry, so they persist in sync and in the backup file automatically
+- **Favorite ★** — star a request; favorites float to the top of their folder (rides along in sync and in the backup file automatically)
+- **Filter box** — a search box at the top of the Collection tree filters folders and requests by name as you type
 
 ## Environments ({{variables}})
 - **🌎 Environment switcher** — pick an active environment in the API Testing toolbar (turns green when one is active); "No Environment" disables substitution
@@ -108,6 +105,7 @@ Postman-style request builder: a `[method ▾] [ URL ] [Send ▾]` request line 
 - **Unencrypted response passthrough** — when a sent request's response can't be decrypted, it's shown as plain raw output (not flagged as a decrypt error), since that's the expected result for a plaintext response
 - **Preview on unencrypted responses** — the Preview table is available even when the response wasn't encrypted, as long as the raw body itself is valid JSON
 - **Saved with the request** — Collections and History round-trip the method, headers, and auth alongside the URL/body/token
+- **Status code tooltip** — hover any status code (on the response meta line, in History, and in Saved Responses) to see its meaning, e.g. `204 No Content`
 
 ## Filtering
 - **Custom filter mini-language** — search by method, status, domain, host, scheme, mime-type, protocol, size, headers, running state, cache status, encryption state, API name
@@ -141,6 +139,7 @@ Postman-style request builder: a `[method ▾] [ URL ] [Send ▾]` request line 
 ## Request List
 - **Auto-scroll to latest** — the list always follows the newest incoming request, scrolling it into view as it arrives (also while a column sort is active; filtered-out requests are skipped)
 - **Column headers** — Name, Method, Status, Type, Size, Time (plus optional Initiator, Encryption, Decryption)
+- **Status code tooltip** — hover a status cell to see what the code means, e.g. `204 No Content` or `503 Service Unavailable` (falls back to the status class, like `499 Client Error`, for non-standard codes)
 - **Click to detail** — open a request in the detail pane
 - **Column resizing** — drag any column border at any height to resize
 - **Encrypted badge** — 🔒 icon on encrypted requests

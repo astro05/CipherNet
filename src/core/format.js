@@ -72,6 +72,48 @@ export function formatBody(text) {
     }
   );
 }
+// HTTP status reason phrases (RFC 9110 + common extensions), used for the
+// hover tooltip that explains what a status code means.
+const STATUS_PHRASES = {
+  100: "Continue", 101: "Switching Protocols", 102: "Processing", 103: "Early Hints",
+  200: "OK", 201: "Created", 202: "Accepted", 203: "Non-Authoritative Information",
+  204: "No Content", 205: "Reset Content", 206: "Partial Content", 207: "Multi-Status",
+  208: "Already Reported", 226: "IM Used",
+  300: "Multiple Choices", 301: "Moved Permanently", 302: "Found", 303: "See Other",
+  304: "Not Modified", 305: "Use Proxy", 307: "Temporary Redirect", 308: "Permanent Redirect",
+  400: "Bad Request", 401: "Unauthorized", 402: "Payment Required", 403: "Forbidden",
+  404: "Not Found", 405: "Method Not Allowed", 406: "Not Acceptable",
+  407: "Proxy Authentication Required", 408: "Request Timeout", 409: "Conflict",
+  410: "Gone", 411: "Length Required", 412: "Precondition Failed", 413: "Content Too Large",
+  414: "URI Too Long", 415: "Unsupported Media Type", 416: "Range Not Satisfiable",
+  417: "Expectation Failed", 418: "I'm a Teapot", 421: "Misdirected Request",
+  422: "Unprocessable Content", 423: "Locked", 424: "Failed Dependency", 425: "Too Early",
+  426: "Upgrade Required", 428: "Precondition Required", 429: "Too Many Requests",
+  431: "Request Header Fields Too Large", 451: "Unavailable For Legal Reasons",
+  500: "Internal Server Error", 501: "Not Implemented", 502: "Bad Gateway",
+  503: "Service Unavailable", 504: "Gateway Timeout", 505: "HTTP Version Not Supported",
+  506: "Variant Also Negotiates", 507: "Insufficient Storage", 508: "Loop Detected",
+  510: "Not Extended", 511: "Network Authentication Required",
+};
+const STATUS_CLASSES = {
+  1: "Informational", 2: "Success", 3: "Redirection", 4: "Client Error", 5: "Server Error",
+};
+// Reason phrase for an HTTP status code, e.g. 204 → "No Content". Empty for
+// unknown codes (browsers leave statusText blank on HTTP/2, so we fill it in).
+export function statusPhrase(code) {
+  return STATUS_PHRASES[Number(code)] || "";
+}
+// Human-readable meaning of a status code for a hover tooltip, e.g.
+// 204 → "204 No Content". Falls back to the status class ("418 Client Error"
+// style) for codes not in the table, and "" when there's no code to explain.
+export function statusTitle(code) {
+  const n = Number(code);
+  if (!n) return "";
+  const phrase = STATUS_PHRASES[n];
+  if (phrase) return `${n} ${phrase}`;
+  const cls = STATUS_CLASSES[Math.floor(n / 100)];
+  return cls ? `${n} ${cls}` : String(n);
+}
 export function safeDecode(s) { try { return decodeURIComponent(s); } catch { return null; } }
 export function safeAtob(b64) { try { return atob(b64); } catch { return b64; } }
 // Drop a single pair of surrounding double-quotes (CipherNet sometimes returns the

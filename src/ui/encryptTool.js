@@ -8,7 +8,7 @@ import { state } from "../core/state.js";
 import { els } from "../core/els.js";
 import { el } from "../core/dom.js";
 import { CipherNetCrypto } from "../core/crypto.js";
-import { safeDecode, fmtTime, fmtSize, stripQuotes } from "../core/format.js";
+import { safeDecode, fmtTime, fmtSize, stripQuotes, statusPhrase, statusTitle } from "../core/format.js";
 import {
   getCollections, setCollections, loadHistory, addHistoryEntry, removeHistoryEntry, clearHistory,
   getEnvironments, setEnvironments,
@@ -446,67 +446,75 @@ els.saveReqBtn.addEventListener("click", () => {
   checkDirty();
 });
 
-/* ---- Saved-request metadata: favorite ★ / color / tags / note ---- */
-// These live inside the collection entry alongside the request fields, so they
-// persist in sync AND ride along in the backup file with no extra plumbing.
-const REQ_COLORS = ["", "#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6"];
-
-// Merge the request state with any existing metadata so a re-save (Add / 💾 Save)
-// never wipes a request's favorite / color / tags / note.
+/* ---- Saved-request metadata: favorite ★ ---- */
+// Lives inside the collection entry alongside the request fields, so it persists
+// in sync AND rides along in the backup file with no extra plumbing.
+// Preserve the favorite flag on a re-save (Add / 💾 Save) so it isn't wiped.
 function withMeta(reqState, prev) {
   const out = { ...reqState };
-  if (prev) for (const k of ["fav", "color", "tags", "note"]) if (prev[k] != null) out[k] = prev[k];
+  if (prev && prev.fav != null) out.fav = prev.fav;
   return out;
 }
-function reqAt(folder, name) { return collections[folder] && collections[folder][name]; }
 function toggleFav(folder, name) {
-  const r = reqAt(folder, name); if (!r) return;
+  const r = collections[folder] && collections[folder][name];
+  if (!r) return;
   r.fav = !r.fav;
   persistCollections();
-  renderCollectionTree();
-}
-function cycleColor(folder, name) {
-  const r = reqAt(folder, name); if (!r) return;
-  r.color = REQ_COLORS[(REQ_COLORS.indexOf(r.color || "") + 1) % REQ_COLORS.length];
-  persistCollections();
-  renderCollectionTree();
-}
-function editTags(folder, name) {
-  const r = reqAt(folder, name); if (!r) return;
-  const cur = (r.tags || []).join(", ");
-  const next = prompt("Tags (comma-separated):", cur);
-  if (next == null) return;
-  r.tags = next.split(",").map((t) => t.trim()).filter(Boolean);
-  persistCollections();
-  renderCollectionTree();
-}
-function editNote(folder, name) {
-  const r = reqAt(folder, name); if (!r) return;
-  const next = prompt("Note:", r.note || "");
-  if (next == null) return;
-  r.note = next.trim();
-  if (!r.note) delete r.note;
-  persistCollections();
-  renderCollectionTree();
+  renderCollectionList();
 }
 
-/* ---- 📚 Collection: a tree of folders → APIs, each deletable ---- */
+/* ---- 📚 Collection: a filterable tree of folders → APIs, each deletable ---- */
+let collectionFilter = ""; // live substring filter over folder/request names
 els.collectionBtn.addEventListener("click", () => {
   const willOpen = els.collectionPanel.hidden;
   closePanels();
   if (!willOpen) return;
   renderCollectionTree();
   els.collectionPanel.hidden = false;
+  const search = els.collectionPanel.querySelector(".tree-search");
+  if (search) search.focus();
 });
+
+// Rebuilds the whole panel: a persistent search box + the (filtered) tree list.
 function renderCollectionTree() {
   const panel = els.collectionPanel;
   panel.innerHTML = "";
+  const search = el("input", "tree-search");
+  search.type = "text";
+  search.placeholder = "Filter requests…";
+  search.spellcheck = false;
+  search.value = collectionFilter;
+  // Only the list re-renders on each keystroke, so the search box keeps focus.
+  search.addEventListener("input", () => { collectionFilter = search.value; renderCollectionList(); });
+  panel.appendChild(search);
+  panel.appendChild(el("div", "tree-list"));
+  renderCollectionList();
+}
+
+// Rebuilds just the folder/request list, applying the current filter.
+function renderCollectionList() {
+  const listEl = els.collectionPanel.querySelector(".tree-list");
+  if (!listEl) return;
+  listEl.innerHTML = "";
+
   const folders = Object.keys(collections).sort();
   if (!folders.length) {
-    panel.appendChild(el("div", "muted-block", "No saved requests yet — use ➕ Add."));
+    listEl.appendChild(el("div", "muted-block", "No saved requests yet — use ➕ Add."));
     return;
   }
+  const q = collectionFilter.trim().toLowerCase();
+  let shown = 0;
   for (const folder of folders) {
+    const folderMatches = folder.toLowerCase().includes(q);
+    // Favorites float to the top of their folder, then alphabetical.
+    const apis = Object.keys(collections[folder]).sort((a, b) => {
+      const fa = collections[folder][a].fav ? 0 : 1, fb = collections[folder][b].fav ? 0 : 1;
+      return fa - fb || a.localeCompare(b);
+    });
+    const visible = q && !folderMatches ? apis.filter((n) => n.toLowerCase().includes(q)) : apis;
+    if (q && !folderMatches && !visible.length) continue; // hide folders with no match
+    shown += visible.length;
+
     const fRow = el("div", "tree-folder");
     fRow.append(el("span", "tree-ic", "📁"), el("span", "tree-name", folder));
     const fRen = el("button", "tree-rename", "✎");
@@ -516,54 +524,29 @@ function renderCollectionTree() {
     fDel.title = "Delete folder and its requests";
     fDel.addEventListener("click", (e) => { e.stopPropagation(); delFolder(folder); });
     fRow.append(fRen, fDel);
-    panel.appendChild(fRow);
+    listEl.appendChild(fRow);
 
-    // Favorites float to the top of their folder, then alphabetical.
-    const apis = Object.keys(collections[folder]).sort((a, b) => {
-      const fa = collections[folder][a].fav ? 0 : 1, fb = collections[folder][b].fav ? 0 : 1;
-      return fa - fb || a.localeCompare(b);
-    });
-    if (!apis.length) panel.appendChild(el("div", "tree-empty", "(empty)"));
-    for (const name of apis) {
+    if (!visible.length) listEl.appendChild(el("div", "tree-empty", "(empty)"));
+    for (const name of visible) {
       const req = collections[folder][name];
       const aRow = el("div", "tree-api" + (currentRef && currentRef.folder === folder && currentRef.name === name ? " active" : ""));
-      if (req.color) aRow.style.borderLeft = `3px solid ${req.color}`;
-      if (req.note) aRow.title = req.note;
-
       const star = el("button", "tree-star" + (req.fav ? " on" : ""), req.fav ? "★" : "☆");
       star.title = req.fav ? "Unfavorite" : "Favorite";
       star.addEventListener("click", (e) => { e.stopPropagation(); toggleFav(folder, name); });
+      aRow.append(star, el("span", "tree-ic", "•"), el("span", "tree-name", name));
 
-      const swatch = el("button", "tree-swatch");
-      swatch.style.background = req.color || "transparent";
-      swatch.title = "Cycle colour";
-      swatch.addEventListener("click", (e) => { e.stopPropagation(); cycleColor(folder, name); });
-
-      aRow.append(star, swatch, el("span", "tree-ic", "•"), el("span", "tree-name", name));
-
-      if (req.tags && req.tags.length) {
-        const tags = el("span", "tree-tags");
-        for (const t of req.tags) tags.appendChild(el("span", "tag-chip", t));
-        aRow.appendChild(tags);
-      }
-
-      const aTag = el("button", "tree-rename", "🏷");
-      aTag.title = "Edit tags";
-      aTag.addEventListener("click", (e) => { e.stopPropagation(); editTags(folder, name); });
-      const aNote = el("button", "tree-rename" + (req.note ? " has-note" : ""), "📝");
-      aNote.title = req.note ? "Edit note" : "Add a note";
-      aNote.addEventListener("click", (e) => { e.stopPropagation(); editNote(folder, name); });
       const aRen = el("button", "tree-rename", "✎");
       aRen.title = "Rename request";
       aRen.addEventListener("click", (e) => { e.stopPropagation(); renameApi(folder, name); });
       const aDel = el("button", "tree-del", "🗑");
       aDel.title = "Delete request";
       aDel.addEventListener("click", (e) => { e.stopPropagation(); delApi(folder, name); });
-      aRow.append(aTag, aNote, aRen, aDel);
+      aRow.append(aRen, aDel);
       aRow.addEventListener("click", () => loadApi(folder, name));
-      panel.appendChild(aRow);
+      listEl.appendChild(aRow);
     }
   }
+  if (q && shown === 0) listEl.appendChild(el("div", "muted-block", "No requests match your filter."));
 }
 
 /* ---- 🕘 History: an automatic, unnamed log of the last 100 sent requests ---- */
@@ -647,6 +630,16 @@ els.historyBtn.addEventListener("click", () => {
   els.historyPanel.hidden = false;
 });
 
+// A status-code chip whose tooltip explains what the code means on hover
+// (e.g. hovering 204 shows "204 No Content").
+function statusSpan(status) {
+  const ok = status >= 200 && status < 400;
+  const span = el("span", "rhist-status " + (ok ? "ok" : "bad"), String(status || "—"));
+  const title = statusTitle(status);
+  if (title) span.title = title;
+  return span;
+}
+
 function renderHistoryPanel() {
   const panel = els.historyPanel;
   panel.innerHTML = "";
@@ -670,11 +663,10 @@ function renderHistoryPanel() {
     return;
   }
   for (const h of history) {
-    const ok = h.status >= 200 && h.status < 400;
     const row = el("div", "hist-row");
     row.append(
       el("span", "rhist-method", h.method),
-      el("span", "rhist-status " + (ok ? "ok" : "bad"), String(h.status || "—")),
+      statusSpan(h.status),
       el("span", "rhist-url", h.url),
       el("span", "rhist-time", fmtTime(h.timeMs))
     );
@@ -779,11 +771,10 @@ function renderSavedPanel() {
     return;
   }
   for (const s of savedResponses) {
-    const ok = s.status >= 200 && s.status < 400;
     const row = el("div", "hist-row");
     row.append(
       el("span", "rhist-method", s.method),
-      el("span", "rhist-status " + (ok ? "ok" : "bad"), String(s.status || "—")),
+      statusSpan(s.status),
       el("span", "rhist-url", s.name),
       el("span", "rhist-time", fmtSize(s.size))
     );
@@ -1135,20 +1126,6 @@ function splitUrlForEncrypt(url) {
 }
 
 /* ------- Send Encrypted / Send Plain: fire the request like Postman ------- */
-// Common reason phrases (the browser leaves statusText empty on HTTP/2).
-function reasonPhrase(code) {
-  const M = {
-    200: "OK", 201: "Created", 202: "Accepted", 204: "No Content",
-    301: "Moved Permanently", 302: "Found", 304: "Not Modified",
-    400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found",
-    405: "Method Not Allowed", 409: "Conflict", 415: "Unsupported Media Type",
-    422: "Unprocessable Entity", 429: "Too Many Requests",
-    500: "Internal Server Error", 502: "Bad Gateway", 503: "Service Unavailable",
-    504: "Gateway Timeout",
-  };
-  return M[code] || "";
-}
-
 // mode "encrypt": encrypt the query string + body first, then send.
 // mode "decrypt": send the URL/body exactly as entered (no encryption).
 // The chosen HTTP method, custom Headers and Bearer Token are all applied as-is.
@@ -1248,8 +1225,10 @@ function renderResponseView(entry) {
 
   const ok = entry.status >= 200 && entry.status < 400;
   const meta = el("div", "resp-meta");
-  meta.appendChild(el("span", "resp-status " + (ok ? "ok" : "bad"),
-    `${entry.status} ${entry.statusText || reasonPhrase(entry.status)}`.trim()));
+  const statusEl = el("span", "resp-status " + (ok ? "ok" : "bad"),
+    `${entry.status} ${entry.statusText || statusPhrase(entry.status)}`.trim());
+  statusEl.title = statusTitle(entry.status); // hover explains the code, e.g. "204 No Content"
+  meta.appendChild(statusEl);
   meta.appendChild(el("span", "resp-dim", fmtTime(entry.timeMs)));
   meta.appendChild(el("span", "resp-dim", fmtSize(entry.size)));
   meta.appendChild(el("span", "resp-dim", `${entry.method} ${entry.url}`));
@@ -1402,10 +1381,9 @@ function respHistory(current) {
   const list = el("div", "resp-history");
   for (let i = sendHistory.length - 1; i >= 0; i--) {
     const h = sendHistory[i];
-    const ok = h.status >= 200 && h.status < 400;
     const row = el("button", "rhist-row" + (h === current ? " active" : ""));
     row.appendChild(el("span", "rhist-method", h.method));
-    row.appendChild(el("span", "rhist-status " + (ok ? "ok" : "bad"), String(h.status)));
+    row.appendChild(statusSpan(h.status));
     row.appendChild(el("span", "rhist-url", h.url));
     row.appendChild(el("span", "rhist-time", fmtTime(h.timeMs)));
     row.addEventListener("click", () => { respTab = "body"; renderResponseView(h); });

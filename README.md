@@ -1,4 +1,4 @@
-**Version:** 2.19.0 | **Last Modified:** 2026-07-18
+**Version:** 2.19.2 | **Last Modified:** 2026-07-18
 
 ![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)
@@ -131,12 +131,12 @@ to .NET's default — so round-trips match byte-for-byte.
     open, tools appear in the toolbar after **🔐 Encrypt/Decrypt**:
     - **➕ Add** — opens a small panel to name the request (**API name**) and pick
       or create a **folder**, then saves it (method, URL, headers, body, token) locally.
-    - **📚 Collection** — a dropdown **tree** of every folder → API; click an API
-      to load it, or use the **🗑** icon on any row to delete that folder (with
-      its requests) or a single request. Each request also has a **★ favorite**
-      (favorites sort to the top), a **colour** swatch (cycles a palette, tints the
-      row's left border), **🏷 tags** (chips), and a **📝 note** — all saved with the
-      request and included in the backup file.
+    - **📚 Collection** — a dropdown **tree** of every folder → API with a **filter
+      box** at the top (type to narrow folders/requests by name); click an API to
+      load it, or use the **🗑** icon on any row to delete that folder (with its
+      requests) or a single request. Each request has a **★ favorite** toggle
+      (favorites sort to the top), saved with the request and included in the backup
+      file.
     - **💾 Save** — appears only after you **load** a saved request and then
       **modify** it, and updates that saved request in place.
 

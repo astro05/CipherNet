@@ -4,7 +4,7 @@
 import { state, DEFAULT_LIST_WIDTH } from "../core/state.js";
 import { els } from "../core/els.js";
 import { el, debounce } from "../core/dom.js";
-import { nameOf, fmtSize, fmtTime } from "../core/format.js";
+import { nameOf, fmtSize, fmtTime, statusTitle } from "../core/format.js";
 import { typeLabel, rowHidden } from "../services/filters.js";
 import { saveSettings } from "../services/storage.js";
 import { clearPendingIndex } from "../services/capture.js";
@@ -86,6 +86,9 @@ function statusCell(entry, td) {
   }
   td.className += " " + (entry.status >= 400 ? "status-bad" : "status-ok");
   td.textContent = entry.status;
+  td.title = entry.statusText
+    ? `${entry.status} ${entry.statusText}`
+    : statusTitle(entry.status); // hover shows the code's meaning, e.g. "204 No Content"
 }
 
 /* --- table head + colgroup --- */
