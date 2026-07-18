@@ -15,11 +15,15 @@
 // The file holds saved requests and history only. Keys and IVs are deliberately
 // never written to it (PRD §24) — they stay in chrome.storage.
 
-import { getCollections, setCollections, loadHistory, setHistoryBulk } from "./storage.js";
+import {
+  getCollections, setCollections, loadHistory, setHistoryBulk,
+  getEnvironments, setEnvironmentsMap, loadSavedResponses, updateSavedResponses,
+} from "./storage.js";
 
 const FORMAT = "ciphernet-backup";
-const FORMAT_VERSION = 1;
+const FORMAT_VERSION = 2; // v2 adds environments + savedResponses (v1 files still load)
 const HIST_MAX_ITEMS = 100;
+const SAVED_RESP_MAX = 50;
 const WRITE_DEBOUNCE_MS = 600;
 
 function send(msg) {
@@ -52,7 +56,7 @@ export function unlink() {
 
 /* ------------------------------ file format ------------------------------ */
 
-export function serialize(collections, history) {
+export function serialize(collections, history, environments, savedResponses) {
   return JSON.stringify({
     format: FORMAT,
     version: FORMAT_VERSION,
@@ -61,17 +65,24 @@ export function serialize(collections, history) {
     // Order doesn't matter — mergeHistory re-sorts by timestamp on the way back
     // in. `_key` is a chrome.storage shard name, meaningless in a file: drop it.
     history: (history || []).map(({ _key, ...rest }) => rest),
+    // v2 additions. Only the environment variable *map* is stored (not which one
+    // a device has active) — each device picks its own active environment.
+    environments: environments || {},
+    savedResponses: savedResponses || [],
   }, null, 2);
 }
 
 // Throws on anything that isn't a backup file, so callers can flag a bad pick.
+// v1 files (no environments/savedResponses) load fine — the fields default empty.
 export function parse(text) {
   let data;
   try { data = JSON.parse(text); } catch { throw new Error("not a JSON file"); }
   if (!data || data.format !== FORMAT) throw new Error("not a CipherNet backup file");
   const collections = data.collections && typeof data.collections === "object" ? data.collections : {};
   const history = Array.isArray(data.history) ? data.history : [];
-  return { collections, history };
+  const environments = data.environments && typeof data.environments === "object" ? data.environments : {};
+  const savedResponses = Array.isArray(data.savedResponses) ? data.savedResponses : [];
+  return { collections, history, environments, savedResponses };
 }
 
 /* -------------------------------- merging -------------------------------- */
@@ -103,6 +114,30 @@ export function mergeHistory(local, incoming) {
     .slice(0, HIST_MAX_ITEMS);
 }
 
+// Union of environments by name; a name collision merges the two variable maps,
+// with `preferIncoming` deciding who wins a per-variable collision.
+export function mergeEnvironments(local, incoming, preferIncoming) {
+  const out = {};
+  for (const name of new Set([...Object.keys(local || {}), ...Object.keys(incoming || {})])) {
+    const a = (local && local[name]) || {};
+    const b = (incoming && incoming[name]) || {};
+    out[name] = preferIncoming ? { ...a, ...b } : { ...b, ...a };
+  }
+  return out;
+}
+
+// Union of saved responses by their unique id, newest-first, capped.
+export function mergeSavedResponses(local, incoming, preferIncoming) {
+  const ordered = preferIncoming
+    ? [...(incoming || []), ...(local || [])]
+    : [...(local || []), ...(incoming || [])];
+  const byId = new Map();
+  for (const s of ordered) { if (s && s.id && !byId.has(s.id)) byId.set(s.id, s); }
+  return [...byId.values()]
+    .sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")))
+    .slice(0, SAVED_RESP_MAX);
+}
+
 /* ------------------------------- auto-save ------------------------------- */
 // Every Collections/History change schedules a write. Coalesced, because a
 // rename or a burst of sends would otherwise rewrite the file several times in a
@@ -111,20 +146,20 @@ export function mergeHistory(local, incoming) {
 let timer = null;
 let pending = null;
 
-export function scheduleWrite(collections, history) {
-  pending = { collections, history };
+export function scheduleWrite(collections, history, environments, savedResponses) {
+  pending = { collections, history, environments, savedResponses };
   if (timer) clearTimeout(timer);
   timer = setTimeout(() => {
     timer = null;
     const p = pending;
     pending = null;
-    if (p) writeNow(p.collections, p.history);
+    if (p) writeNow(p.collections, p.history, p.environments, p.savedResponses);
   }, WRITE_DEBOUNCE_MS);
 }
 
 // Resolves { ok, reason } — "not-linked" is the normal, uninteresting case.
-export function writeNow(collections, history) {
-  return send({ type: "backup.write", text: serialize(collections, history) });
+export function writeNow(collections, history, environments, savedResponses) {
+  return send({ type: "backup.write", text: serialize(collections, history, environments, savedResponses) });
 }
 
 /* ------------------------- automatic pull on load ------------------------- */
@@ -135,7 +170,7 @@ export function writeNow(collections, history) {
 //
 // Resolves { pulled: false } when there's nothing to do, or
 // { pulled: true, collections, history } with the merged result to render.
-export async function pullOnLoad(localCollections, localHistory) {
+export async function pullOnLoad(localCollections, localHistory, localEnvironments, localSavedResponses) {
   const st = await status();
   if (!st || !st.linked || !st.ready) return { pulled: false, status: st };
 
@@ -149,17 +184,25 @@ export async function pullOnLoad(localCollections, localHistory) {
   // than the file until the next write lands.
   const collections = mergeCollections(localCollections, incoming.collections, false);
   const history = mergeHistory(localHistory, incoming.history);
+  const environments = mergeEnvironments(localEnvironments, incoming.environments, false);
+  const savedResponses = mergeSavedResponses(localSavedResponses, incoming.savedResponses, false);
 
-  const added =
-    JSON.stringify(collections) !== JSON.stringify(localCollections || {}) ||
-    history.length !== (localHistory || []).length;
-  if (!added) return { pulled: true, changed: false, collections, history: localHistory, status: st };
+  const collChanged = JSON.stringify(collections) !== JSON.stringify(localCollections || {});
+  const histChanged = history.length !== (localHistory || []).length;
+  const envChanged = JSON.stringify(environments) !== JSON.stringify(localEnvironments || {});
+  const savedChanged = JSON.stringify(savedResponses) !== JSON.stringify(localSavedResponses || []);
+  if (!collChanged && !histChanged && !envChanged && !savedChanged) {
+    return { pulled: true, changed: false, collections, history: localHistory, environments, savedResponses, status: st };
+  }
 
-  await new Promise((resolve) => setCollections(collections, resolve));
+  if (collChanged) await new Promise((resolve) => setCollections(collections, resolve));
   // Re-shards history, so entries come back with the storage keys they now
   // actually have — the caller deletes single entries by that key.
-  const stored = await setHistoryBulk(history.slice().reverse()); // storage wants oldest-first
-  return { pulled: true, changed: true, collections, history: stored.reverse(), status: st };
+  let storedHistory = localHistory;
+  if (histChanged) storedHistory = (await setHistoryBulk(history.slice().reverse())).reverse(); // storage wants oldest-first
+  if (envChanged) await setEnvironmentsMap(environments);
+  if (savedChanged) await updateSavedResponses(savedResponses);
+  return { pulled: true, changed: true, collections, history: storedHistory, environments, savedResponses, status: st };
 }
 
 /* --------------------------- restore from a file -------------------------- */
@@ -169,20 +212,28 @@ export async function restoreFromText(text) {
   const incoming = parse(text); // throws on a bad file — caller reports it
   const { collections: localCollections } = await getCollections();
   const localHistory = await loadHistory();
+  const { environments: localEnvironments } = await getEnvironments();
+  const localSavedResponses = await loadSavedResponses();
 
   const collections = mergeCollections(localCollections || {}, incoming.collections, true);
   const history = mergeHistory((localHistory || []).slice().reverse(), incoming.history);
+  const environments = mergeEnvironments(localEnvironments || {}, incoming.environments, true);
+  const savedResponses = mergeSavedResponses(localSavedResponses || [], incoming.savedResponses, true);
 
   await new Promise((resolve, reject) =>
     setCollections(collections, (err) => (err ? reject(new Error(err)) : resolve()))
   );
   const storedHistory = await setHistoryBulk(history.slice().reverse());
+  await setEnvironmentsMap(environments);
+  await updateSavedResponses(savedResponses);
 
   const folders = Object.keys(collections).length;
   const requests = Object.values(collections).reduce((n, f) => n + Object.keys(f).length, 0);
   return {
     collections,
     history: storedHistory.slice().reverse(), // newest-first for the panel
+    environments,
+    savedResponses,
     folders,
     requests,
   };

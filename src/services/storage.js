@@ -55,6 +55,63 @@ export function setCollections(map, cb) {
   });
 }
 
+/* ----------------------------- environments ----------------------------- */
+// Postman-style environments: named sets of variables referenced as {{name}} in
+// the API Testing URL / headers / body / token. Small config, so — like
+// Collections — they live in chrome.storage.sync to survive uninstall/reinstall.
+//   environments: { envName: { varName: value } }
+//   activeEnv:    the currently-selected environment name ("" = none)
+export function getEnvironments() {
+  return new Promise((resolve) =>
+    chrome.storage.sync.get(["environments", "activeEnv"], (r) =>
+      resolve({ environments: r.environments || {}, activeEnv: r.activeEnv || "" }))
+  );
+}
+export function setEnvironments(environments, activeEnv, cb) {
+  chrome.storage.sync.set({ environments, activeEnv }, () => {
+    cb && cb(chrome.runtime.lastError ? chrome.runtime.lastError.message : null);
+  });
+}
+// Write only the variable map (used by a backup pull/restore) without disturbing
+// which environment this device has active.
+export function setEnvironmentsMap(environments) {
+  return new Promise((resolve) => chrome.storage.sync.set({ environments }, resolve));
+}
+
+/* -------------------------- saved responses ---------------------------- */
+// Pinned/saved responses keep the FULL response body (plus the request that
+// produced it), which is far too large for the sync quota — so they live in
+// chrome.storage.local instead (bigger budget, but wiped on uninstall, which is
+// an acceptable tradeoff for bulky, best-effort-persistent captures). Capped by
+// count and total bytes with oldest-first eviction so the store can't grow
+// without bound (no `unlimitedStorage` permission).
+const SAVED_RESP_KEY = "savedResponses";
+const SAVED_RESP_MAX_ITEMS = 50;
+const SAVED_RESP_MAX_BYTES = 4_000_000; // ~4 MB, comfortably under local's ~10 MB
+
+export function loadSavedResponses() {
+  return new Promise((resolve) =>
+    chrome.storage.local.get([SAVED_RESP_KEY], (r) => resolve(Array.isArray(r[SAVED_RESP_KEY]) ? r[SAVED_RESP_KEY] : []))
+  );
+}
+// Prepend `entry` (newest-first), evicting the oldest until it fits the count and
+// byte budgets. Resolves { ok, list, evicted } — ok:false only if the single
+// entry alone blows the budget.
+export async function addSavedResponse(entry) {
+  const list = await loadSavedResponses();
+  const next = [entry, ...list];
+  let evicted = 0;
+  while (next.length > SAVED_RESP_MAX_ITEMS) { next.pop(); evicted++; }
+  while (next.length > 1 && JSON.stringify(next).length > SAVED_RESP_MAX_BYTES) { next.pop(); evicted++; }
+  if (JSON.stringify(next).length > SAVED_RESP_MAX_BYTES) return { ok: false, list, evicted };
+  await new Promise((resolve) => chrome.storage.local.set({ [SAVED_RESP_KEY]: next }, resolve));
+  return { ok: true, list: next, evicted };
+}
+export async function updateSavedResponses(list) {
+  await new Promise((resolve) => chrome.storage.local.set({ [SAVED_RESP_KEY]: list }, resolve));
+  return list;
+}
+
 /* ------------------------------- history -------------------------------- */
 // Request History: an automatic (unnamed) log of the last HIST_MAX_ITEMS
 // Send Encrypted / Send Plain requests, so they can be reloaded later. Each

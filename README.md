@@ -1,4 +1,4 @@
-**Version:** 2.17.2 | **Last Modified:** 2026-07-18
+**Version:** 2.19.0 | **Last Modified:** 2026-07-18
 
 ![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)
@@ -112,13 +112,31 @@ to .NET's default — so round-trips match byte-for-byte.
     textarea (prefix a line with `//` to disable it), matching Postman's bulk editor.
   - **Tab indicators** — a green dot marks Params/Authorization/Body when they hold
     content, like Postman.
+  - **🌎 Environments (`{{variables}}`)** — pick an active environment from the
+    toolbar; then `{{name}}` in the URL, headers, body, or token is substituted from
+    that environment **at send time** (the editors keep the `{{name}}` literal, so
+    it's reusable). In the URL, `{{name}}` is **colour-highlighted** (blue when the
+    active environment defines it, red when it doesn't), and typing `{{` opens an
+    **autocomplete** of that environment's variables (↑/↓, Enter/Tab or click to
+    insert). Create / rename / delete environments and edit their `name → value`
+    variables right in the pop-panel. Persisted in `chrome.storage.sync` **and**
+    the backup file; a heads-up in the status line flags any `{{name}}` the active
+    environment doesn't define.
+  - **📌 Save response / 🗂 Saved** — click **📌 Save** on a response to keep its
+    **full** body (plus the request that made it) on disk in `chrome.storage.local`
+    (size-capped, oldest-first eviction) and in the backup file. Browse them under
+    **🗂 Saved**; clicking one re-opens it, re-decrypted with the current key. Only
+    the raw body is stored, never the decrypted plaintext (PRD §24).
   - **Collections (folders of saved requests)** — while the API Testing view is
-    open, three tools appear in the toolbar after **🔐 Encrypt/Decrypt**:
+    open, tools appear in the toolbar after **🔐 Encrypt/Decrypt**:
     - **➕ Add** — opens a small panel to name the request (**API name**) and pick
-      or create a **folder**, then saves it (URL, method, headers, body, token) locally.
+      or create a **folder**, then saves it (method, URL, headers, body, token) locally.
     - **📚 Collection** — a dropdown **tree** of every folder → API; click an API
       to load it, or use the **🗑** icon on any row to delete that folder (with
-      its requests) or a single request.
+      its requests) or a single request. Each request also has a **★ favorite**
+      (favorites sort to the top), a **colour** swatch (cycles a palette, tints the
+      row's left border), **🏷 tags** (chips), and a **📝 note** — all saved with the
+      request and included in the backup file.
     - **💾 Save** — appears only after you **load** a saved request and then
       **modify** it, and updates that saved request in place.
 
@@ -126,20 +144,25 @@ to .NET's default — so round-trips match byte-for-byte.
     folder automatically.
   - **🗄 Backup — surviving removal of the extension.** Chrome erases an
     extension's storage (`local` *and* `sync`) when the extension is removed, so
-    Collections and History are also mirrored to a **file you pick**:
+    Collections, History, **Environments and Saved Responses** are all mirrored to
+    a **file you pick**:
     - **Link backup file…** — opens a small helper tab (Chrome refuses to open a
       file picker inside a DevTools panel) offering **Create a new backup file**
       or **Open an existing backup**. Pick one and every change from then on is
       written to it automatically.
     - **Automatic pull** — each time the panel opens, the linked file is read and
       merged back in. So after re-adding the extension you link the same file
-      once and your folders, requests and history are simply there again.
+      once and your folders, requests, history, environments and saved responses
+      are simply there again.
     - **Restore from file… / Download a copy** — merge in any backup copy, or
-      take a one-off snapshot (e.g. to move Collections to another machine).
-    - The file holds saved requests (including any Bearer tokens) and history.
-      **AES keys and IVs are never written to it.** Chrome drops file permissions
-      when the browser restarts; the 🗄 Backup button turns red when auto-save
-      needs re-authorising, which is one click.
+      take a one-off snapshot (e.g. to move your setup to another machine). Older
+      v1 backups (Collections + History only) still restore fine.
+    - The file holds saved requests, history, environment variables and full
+      saved-response bodies — **including any Bearer tokens** (saved with a request
+      or in an environment). **AES keys and IVs are never written to it**, and the
+      🗄 Backup menu says exactly what the file contains. Chrome drops file
+      permissions when the browser restarts; the 🗄 Backup button turns red when
+      auto-save needs re-authorising, which is one click.
   - **Response viewer** — a Postman-style panel: a status · time · size · method
     URL line, then tabs:
     - **Body** — the response body via `bodyView` (decrypted when possible, with

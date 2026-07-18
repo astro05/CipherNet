@@ -11,6 +11,8 @@ import { CipherNetCrypto } from "../core/crypto.js";
 import { safeDecode, fmtTime, fmtSize, stripQuotes } from "../core/format.js";
 import {
   getCollections, setCollections, loadHistory, addHistoryEntry, removeHistoryEntry, clearHistory,
+  getEnvironments, setEnvironments,
+  loadSavedResponses, addSavedResponse, updateSavedResponses,
 } from "../services/storage.js";
 import * as backup from "../services/backup.js";
 import { bodyView } from "./detail.js";
@@ -83,13 +85,277 @@ let collections = {};
 let currentRef = null;      // { folder, name } of the loaded/saved request, or null
 let currentSnapshot = null; // snapshot() captured at load/save time (for dirty checks)
 
-// Write collections to chrome.storage *and* mirror them to the backup file (a
-// no-op when none is linked). Every mutation below goes through here so the file
-// can't drift from the live store.
+// Mirror the full backed-up state (collections, history, environments, saved
+// responses) to the linked file. A no-op when none is linked. Everything that
+// mutates any of those four goes through here so the file can't drift.
+function scheduleBackup() {
+  backup.scheduleWrite(collections, history, environments, savedResponses);
+}
+
+// Write collections to chrome.storage *and* mirror them to the backup file.
 function persistCollections(cb) {
   setCollections(collections, cb);
-  backup.scheduleWrite(collections, history);
+  scheduleBackup();
 }
+
+/* --------------------------- environments ({{vars}}) --------------------------- */
+// Postman-style environments: named sets of variables referenced as {{name}} in
+// the URL / headers / body / token, substituted at send time (the editors keep
+// the {{name}} literal, so it's non-destructive). Persisted in chrome.storage.sync.
+let environments = {};   // { envName: { varName: value } }
+let activeEnv = "";      // "" = No Environment
+
+function persistEnvironments(cb) { setEnvironments(environments, activeEnv, cb); scheduleBackup(); }
+
+// Replace every {{name}} with the active environment's value; unknown names are
+// left as-is (so a stray {{x}} is visible rather than silently blanked).
+function resolveVars(str) {
+  if (typeof str !== "string" || str.indexOf("{{") === -1) return str;
+  const vars = (activeEnv && environments[activeEnv]) || null;
+  if (!vars) return str;
+  return str.replace(/\{\{\s*([\w.$-]+)\s*\}\}/g, (m, name) =>
+    Object.prototype.hasOwnProperty.call(vars, name) ? vars[name] : m);
+}
+// Names still unresolved after substitution (for a gentle heads-up on send).
+function unresolvedVars(strings) {
+  const out = new Set();
+  for (const s of strings) {
+    if (typeof s !== "string") continue;
+    const m = s.match(/\{\{\s*[\w.$-]+\s*\}\}/g);
+    if (m) for (const t of m) out.add(t);
+  }
+  return [...out];
+}
+
+function updateEnvLabel() {
+  els.envLabel.textContent = activeEnv || "No Env";
+  els.envBtn.classList.toggle("env-on", !!activeEnv);
+}
+
+els.envBtn.addEventListener("click", () => {
+  const willOpen = els.envPanel.hidden;
+  closePanels();
+  if (!willOpen) return;
+  renderEnvPanel();
+  els.envPanel.hidden = false;
+});
+
+function setActiveEnv(name) {
+  activeEnv = environments[name] ? name : "";
+  updateEnvLabel();
+  persistEnvironments();
+  renderEnvPanel();
+  refreshUrlHighlight(); // known/unknown colouring depends on the active env
+}
+
+// Read the variable rows currently on screen back into the active environment.
+function collectEnvVars() {
+  if (!activeEnv) return;
+  const vars = {};
+  for (const row of els.envPanel.querySelectorAll(".env-var-row")) {
+    const name = row.querySelector(".env-var-name").value.trim();
+    if (name) vars[name] = row.querySelector(".env-var-val").value;
+  }
+  environments[activeEnv] = vars;
+  persistEnvironments();
+  updateReqTabIndicators(); // {{token}} in the auth box may now resolve/stop resolving
+  refreshUrlHighlight();    // a URL {{var}} may have just become defined/undefined
+}
+
+function makeEnvVarRow(name = "", value = "") {
+  const row = el("div", "env-var-row");
+  const mk = (cls, ph, val) => {
+    const inp = el("input", cls);
+    inp.type = "text";
+    inp.placeholder = ph;
+    inp.spellcheck = false;
+    inp.value = val;
+    return inp;
+  };
+  const rm = el("button", "ep-remove", "✕");
+  rm.type = "button";
+  rm.title = "Remove variable";
+  rm.addEventListener("click", () => { row.remove(); collectEnvVars(); ensureEnvTrailingRow(); });
+  row.append(mk("env-var-name", "variable", name), mk("env-var-val", "value", value), rm);
+  return row;
+}
+function ensureEnvTrailingRow() {
+  const body = els.envPanel.querySelector(".env-vars");
+  if (!body) return;
+  const rows = [...body.querySelectorAll(".env-var-row")];
+  const last = rows[rows.length - 1];
+  if (!last || last.querySelector(".env-var-name").value !== "" || last.querySelector(".env-var-val").value !== "") {
+    body.appendChild(makeEnvVarRow());
+  }
+}
+
+function renderEnvPanel() {
+  const panel = els.envPanel;
+  panel.innerHTML = "";
+  panel.appendChild(el("div", "pop-title", "Environments"));
+
+  // Environment chooser: "No Environment" + each env, with rename/delete.
+  const list = el("div", "env-list");
+  const addEnvRow = (label, name) => {
+    const active = activeEnv === name;
+    const row = el("div", "env-row" + (active ? " active" : ""));
+    row.append(el("span", "env-radio", active ? "●" : "○"), el("span", "env-name", label));
+    if (name) {
+      const ren = el("button", "tree-rename", "✎");
+      ren.title = "Rename environment";
+      ren.addEventListener("click", (e) => { e.stopPropagation(); renameEnv(name); });
+      const del = el("button", "tree-del", "🗑");
+      del.title = "Delete environment";
+      del.addEventListener("click", (e) => { e.stopPropagation(); deleteEnv(name); });
+      row.append(ren, del);
+    }
+    row.addEventListener("click", () => setActiveEnv(name));
+    list.appendChild(row);
+  };
+  addEnvRow("No Environment", "");
+  for (const name of Object.keys(environments).sort()) addEnvRow(name, name);
+  panel.appendChild(list);
+
+  // New environment.
+  const addWrap = el("div", "env-add");
+  const input = el("input", "env-new");
+  input.type = "text";
+  input.placeholder = "New environment name";
+  input.spellcheck = false;
+  const addBtn = el("button", "linkbtn", "Create");
+  const create = () => {
+    const name = input.value.trim();
+    if (!name) return;
+    if (environments[name]) { flashEnc(`Environment “${name}” already exists.`, true); return; }
+    environments[name] = {};
+    activeEnv = name;
+    updateEnvLabel();
+    persistEnvironments();
+    renderEnvPanel();
+  };
+  addBtn.addEventListener("click", create);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") create(); });
+  addWrap.append(input, addBtn);
+  panel.appendChild(addWrap);
+
+  // Variables editor for the active environment.
+  panel.appendChild(el("div", "menu-sep"));
+  if (!activeEnv) {
+    panel.appendChild(el("div", "muted-block", "Select or create an environment to add {{variables}}."));
+    return;
+  }
+  panel.appendChild(el("div", "env-vars-title muted", `Variables for “${activeEnv}” — reference as {{name}}`));
+  const vars = el("div", "env-vars");
+  const entries = Object.entries(environments[activeEnv] || {});
+  for (const [k, v] of entries) vars.appendChild(makeEnvVarRow(k, v));
+  vars.appendChild(makeEnvVarRow()); // trailing add row
+  vars.addEventListener("input", () => { collectEnvVars(); ensureEnvTrailingRow(); });
+  panel.appendChild(vars);
+}
+
+function renameEnv(name) {
+  const next = (prompt("Rename environment:", name) || "").trim();
+  if (!next || next === name) return;
+  if (environments[next]) { flashEnc(`Environment “${next}” already exists.`, true); return; }
+  environments[next] = environments[name];
+  delete environments[name];
+  if (activeEnv === name) activeEnv = next;
+  updateEnvLabel();
+  persistEnvironments();
+  renderEnvPanel();
+}
+function deleteEnv(name) {
+  delete environments[name];
+  if (activeEnv === name) activeEnv = "";
+  updateEnvLabel();
+  persistEnvironments();
+  renderEnvPanel();
+}
+
+/* ---- URL field: {{var}} colour highlight + autocomplete ---- */
+// A backdrop <div> mirrors the URL text with {{name}} wrapped in coloured spans
+// (blue when defined in the active env, red when not); the real input sits on top
+// with transparent text so only its caret shows.
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function highlightVarsHtml(text) {
+  const vars = (activeEnv && environments[activeEnv]) || {};
+  const re = /\{\{\s*([\w.$-]+)\s*\}\}/g;
+  let out = "", last = 0, m;
+  while ((m = re.exec(text))) {
+    out += escapeHtml(text.slice(last, m.index));
+    const known = Object.prototype.hasOwnProperty.call(vars, m[1]);
+    out += `<span class="var-token${known ? "" : " unknown"}">${escapeHtml(m[0])}</span>`;
+    last = m.index + m[0].length;
+  }
+  return out + escapeHtml(text.slice(last));
+}
+function refreshUrlHighlight() {
+  els.encUrlHl.innerHTML = highlightVarsHtml(els.encUrl.value);
+  els.encUrlHl.scrollLeft = els.encUrl.scrollLeft;
+}
+
+// Autocomplete: while the caret sits just after an unclosed {{prefix, offer the
+// active environment's matching variable names.
+let suggestItems = [];
+let suggestIndex = 0;
+let suggestCtx = null;
+function varPrefixAtCaret() {
+  const caret = els.encUrl.selectionStart;
+  if (caret == null) return null;
+  const before = els.encUrl.value.slice(0, caret);
+  const m = before.match(/\{\{\s*([\w.$-]*)$/);
+  return m ? { prefix: m[1], start: caret - m[0].length, caret } : null;
+}
+function showVarSuggest() {
+  const ctx = varPrefixAtCaret();
+  const names = (activeEnv && environments[activeEnv]) ? Object.keys(environments[activeEnv]) : [];
+  if (!ctx || !names.length) return hideVarSuggest();
+  const matches = names.filter((n) => n.toLowerCase().startsWith(ctx.prefix.toLowerCase())).sort();
+  if (!matches.length) return hideVarSuggest();
+  suggestItems = matches;
+  suggestIndex = 0;
+  suggestCtx = ctx;
+  renderVarSuggest();
+  els.varSuggest.hidden = false;
+}
+function renderVarSuggest() {
+  els.varSuggest.innerHTML = "";
+  const vars = environments[activeEnv] || {};
+  suggestItems.forEach((name, i) => {
+    const it = el("div", "var-suggest-item" + (i === suggestIndex ? " active" : ""));
+    it.append(el("span", "vs-name", `{{${name}}}`), el("span", "vs-val", String(vars[name] ?? "")));
+    // mousedown (not click) so the input doesn't blur before we insert.
+    it.addEventListener("mousedown", (e) => { e.preventDefault(); insertVar(name); });
+    els.varSuggest.appendChild(it);
+  });
+}
+function hideVarSuggest() { els.varSuggest.hidden = true; suggestItems = []; suggestCtx = null; }
+function insertVar(name) {
+  const ctx = suggestCtx || varPrefixAtCaret();
+  if (!ctx) return hideVarSuggest();
+  const insert = `{{${name}}}`;
+  els.encUrl.value = els.encUrl.value.slice(0, ctx.start) + insert + els.encUrl.value.slice(ctx.caret);
+  const pos = ctx.start + insert.length;
+  els.encUrl.setSelectionRange(pos, pos);
+  hideVarSuggest();
+  renderParamsFromUrl(); // URL changed → rebuild the params table + highlight
+  refreshUrlHighlight();
+  checkDirty();
+  els.encUrl.focus();
+}
+els.encUrl.addEventListener("input", () => { refreshUrlHighlight(); showVarSuggest(); });
+els.encUrl.addEventListener("scroll", () => { els.encUrlHl.scrollLeft = els.encUrl.scrollLeft; });
+els.encUrl.addEventListener("click", showVarSuggest);
+els.encUrl.addEventListener("blur", () => setTimeout(hideVarSuggest, 120));
+els.encUrl.addEventListener("keydown", (e) => {
+  if (els.varSuggest.hidden || !suggestItems.length) return;
+  if (e.key === "ArrowDown") { e.preventDefault(); suggestIndex = (suggestIndex + 1) % suggestItems.length; renderVarSuggest(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); suggestIndex = (suggestIndex - 1 + suggestItems.length) % suggestItems.length; renderVarSuggest(); }
+  else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertVar(suggestItems[suggestIndex]); }
+  else if (e.key === "Escape") { e.preventDefault(); hideVarSuggest(); }
+});
 
 // The full request state a collection entry / history load round-trips through.
 function snapshot() {
@@ -131,6 +397,8 @@ function closePanels() {
   els.collectionPanel.hidden = true;
   els.historyPanel.hidden = true;
   els.backupMenu.hidden = true;
+  els.envPanel.hidden = true;
+  els.savedPanel.hidden = true;
 }
 // Close the pop-panels when clicking anywhere outside the collection tools.
 document.addEventListener("click", (e) => {
@@ -159,7 +427,7 @@ els.addSaveBtn.addEventListener("click", () => {
   applyOpenBulk(); // fold any open Bulk Edit box back into the tables first
   const folder = els.addNewFolder.value.trim() || els.addFolder.value || "Default";
   if (!collections[folder]) collections[folder] = {};
-  collections[folder][name] = snapshot();
+  collections[folder][name] = withMeta(snapshot(), collections[folder][name]);
   persistCollections((err) => flashEnc(err ? `Save failed: ${err}` : `Saved “${name}” to “${folder}” ✓`, !!err));
   currentRef = { folder, name };
   currentSnapshot = snapshot();
@@ -172,11 +440,55 @@ els.saveReqBtn.addEventListener("click", () => {
   if (!currentRef) return;
   applyOpenBulk();
   if (!collections[currentRef.folder]) collections[currentRef.folder] = {};
-  collections[currentRef.folder][currentRef.name] = snapshot();
+  collections[currentRef.folder][currentRef.name] = withMeta(snapshot(), collections[currentRef.folder][currentRef.name]);
   persistCollections((err) => flashEnc(err ? `Save failed: ${err}` : `Updated “${currentRef.name}” ✓`, !!err));
   currentSnapshot = snapshot();
   checkDirty();
 });
+
+/* ---- Saved-request metadata: favorite ★ / color / tags / note ---- */
+// These live inside the collection entry alongside the request fields, so they
+// persist in sync AND ride along in the backup file with no extra plumbing.
+const REQ_COLORS = ["", "#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6"];
+
+// Merge the request state with any existing metadata so a re-save (Add / 💾 Save)
+// never wipes a request's favorite / color / tags / note.
+function withMeta(reqState, prev) {
+  const out = { ...reqState };
+  if (prev) for (const k of ["fav", "color", "tags", "note"]) if (prev[k] != null) out[k] = prev[k];
+  return out;
+}
+function reqAt(folder, name) { return collections[folder] && collections[folder][name]; }
+function toggleFav(folder, name) {
+  const r = reqAt(folder, name); if (!r) return;
+  r.fav = !r.fav;
+  persistCollections();
+  renderCollectionTree();
+}
+function cycleColor(folder, name) {
+  const r = reqAt(folder, name); if (!r) return;
+  r.color = REQ_COLORS[(REQ_COLORS.indexOf(r.color || "") + 1) % REQ_COLORS.length];
+  persistCollections();
+  renderCollectionTree();
+}
+function editTags(folder, name) {
+  const r = reqAt(folder, name); if (!r) return;
+  const cur = (r.tags || []).join(", ");
+  const next = prompt("Tags (comma-separated):", cur);
+  if (next == null) return;
+  r.tags = next.split(",").map((t) => t.trim()).filter(Boolean);
+  persistCollections();
+  renderCollectionTree();
+}
+function editNote(folder, name) {
+  const r = reqAt(folder, name); if (!r) return;
+  const next = prompt("Note:", r.note || "");
+  if (next == null) return;
+  r.note = next.trim();
+  if (!r.note) delete r.note;
+  persistCollections();
+  renderCollectionTree();
+}
 
 /* ---- 📚 Collection: a tree of folders → APIs, each deletable ---- */
 els.collectionBtn.addEventListener("click", () => {
@@ -206,18 +518,48 @@ function renderCollectionTree() {
     fRow.append(fRen, fDel);
     panel.appendChild(fRow);
 
-    const apis = Object.keys(collections[folder]).sort();
+    // Favorites float to the top of their folder, then alphabetical.
+    const apis = Object.keys(collections[folder]).sort((a, b) => {
+      const fa = collections[folder][a].fav ? 0 : 1, fb = collections[folder][b].fav ? 0 : 1;
+      return fa - fb || a.localeCompare(b);
+    });
     if (!apis.length) panel.appendChild(el("div", "tree-empty", "(empty)"));
     for (const name of apis) {
+      const req = collections[folder][name];
       const aRow = el("div", "tree-api" + (currentRef && currentRef.folder === folder && currentRef.name === name ? " active" : ""));
-      aRow.append(el("span", "tree-ic", "•"), el("span", "tree-name", name));
+      if (req.color) aRow.style.borderLeft = `3px solid ${req.color}`;
+      if (req.note) aRow.title = req.note;
+
+      const star = el("button", "tree-star" + (req.fav ? " on" : ""), req.fav ? "★" : "☆");
+      star.title = req.fav ? "Unfavorite" : "Favorite";
+      star.addEventListener("click", (e) => { e.stopPropagation(); toggleFav(folder, name); });
+
+      const swatch = el("button", "tree-swatch");
+      swatch.style.background = req.color || "transparent";
+      swatch.title = "Cycle colour";
+      swatch.addEventListener("click", (e) => { e.stopPropagation(); cycleColor(folder, name); });
+
+      aRow.append(star, swatch, el("span", "tree-ic", "•"), el("span", "tree-name", name));
+
+      if (req.tags && req.tags.length) {
+        const tags = el("span", "tree-tags");
+        for (const t of req.tags) tags.appendChild(el("span", "tag-chip", t));
+        aRow.appendChild(tags);
+      }
+
+      const aTag = el("button", "tree-rename", "🏷");
+      aTag.title = "Edit tags";
+      aTag.addEventListener("click", (e) => { e.stopPropagation(); editTags(folder, name); });
+      const aNote = el("button", "tree-rename" + (req.note ? " has-note" : ""), "📝");
+      aNote.title = req.note ? "Edit note" : "Add a note";
+      aNote.addEventListener("click", (e) => { e.stopPropagation(); editNote(folder, name); });
       const aRen = el("button", "tree-rename", "✎");
       aRen.title = "Rename request";
       aRen.addEventListener("click", (e) => { e.stopPropagation(); renameApi(folder, name); });
       const aDel = el("button", "tree-del", "🗑");
       aDel.title = "Delete request";
       aDel.addEventListener("click", (e) => { e.stopPropagation(); delApi(folder, name); });
-      aRow.append(aRen, aDel);
+      aRow.append(aTag, aNote, aRen, aDel);
       aRow.addEventListener("click", () => loadApi(folder, name));
       panel.appendChild(aRow);
     }
@@ -230,6 +572,10 @@ function renderCollectionTree() {
 // synced store in `history`, newest first.
 let history = [];
 
+// 🗂 Saved responses: full response bodies the user explicitly kept, in
+// chrome.storage.local (too big for sync). Newest-first.
+let savedResponses = [];
+
 // Persist one sent request (request + response summary, no response body —
 // see services/storage.js) and mirror it into the in-memory list.
 function saveHistoryEntry(histEntry) {
@@ -237,7 +583,7 @@ function saveHistoryEntry(histEntry) {
     if (!ok) return;
     history.unshift({ ...histEntry, _key: key });
     if (history.length > 100) history.length = 100;
-    backup.scheduleWrite(collections, history);
+    scheduleBackup();
     if (!els.historyPanel.hidden) renderHistoryPanel();
   });
 }
@@ -257,10 +603,24 @@ async function loadStores() {
   }
   history = (await loadHistory()).reverse(); // storage keeps oldest-first; show newest first
 
-  const res = await backup.pullOnLoad(collections, history);
+  const envRes = await getEnvironments();
+  environments = envRes.environments;
+  activeEnv = environments[envRes.activeEnv] ? envRes.activeEnv : "";
+  updateEnvLabel();
+
+  savedResponses = await loadSavedResponses();
+
+  // Fold the linked backup file in on top of the local stores — this is what
+  // brings collections, history, environments AND saved responses back after a
+  // remove/re-add, with no interaction beyond re-linking the file once.
+  const res = await backup.pullOnLoad(collections, history, environments, savedResponses);
   if (res.pulled) {
     collections = res.collections;
     history = res.history;
+    environments = res.environments;
+    if (activeEnv && !environments[activeEnv]) activeEnv = "";
+    savedResponses = res.savedResponses;
+    updateEnvLabel();
   }
   renderOpenPanels();
   refreshBackupState();
@@ -268,6 +628,8 @@ async function loadStores() {
 function renderOpenPanels() {
   if (!els.historyPanel.hidden) renderHistoryPanel();
   if (!els.collectionPanel.hidden) renderCollectionTree();
+  if (!els.envPanel.hidden) renderEnvPanel();
+  if (!els.savedPanel.hidden) renderSavedPanel();
 }
 loadStores();
 
@@ -297,7 +659,7 @@ function renderHistoryPanel() {
     if (!history.length) return;
     history = [];
     clearHistory();
-    backup.scheduleWrite(collections, history);
+    scheduleBackup();
     renderHistoryPanel();
   });
   actions.appendChild(clearBtn);
@@ -322,7 +684,7 @@ function renderHistoryPanel() {
       e.stopPropagation();
       history = history.filter((x) => x !== h);
       if (h._key) removeHistoryEntry(h._key);
-      backup.scheduleWrite(collections, history);
+      scheduleBackup();
       renderHistoryPanel();
     });
     row.appendChild(del);
@@ -335,6 +697,104 @@ function renderHistoryPanel() {
       closePanels();
       flashEnc("Loaded from history");
     });
+    panel.appendChild(row);
+  }
+}
+
+/* ---- 🗂 Saved responses: keep a full response body to revisit later ---- */
+els.savedBtn.addEventListener("click", () => {
+  const willOpen = els.savedPanel.hidden;
+  closePanels();
+  if (!willOpen) return;
+  renderSavedPanel();
+  els.savedPanel.hidden = false;
+});
+
+// Persist the currently-shown response (full body + the request that made it) to
+// chrome.storage.local. The DECRYPTED text is deliberately not stored — only the
+// raw body — so it's re-decrypted with the current key on view (PRD §24).
+async function saveCurrentResponse(entry) {
+  let path = entry.url;
+  try { path = new URL(entry.url).pathname; } catch { /* relative URL — keep as-is */ }
+  const name = (prompt("Save response as:", `${entry.method} ${path}`) || "").trim();
+  if (!name) return;
+  const saved = {
+    id: "sr_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+    name,
+    method: entry.method,
+    url: entry.url,
+    reqBody: entry.reqBody || "",
+    reqHeaders: entry.reqHeaders || {},
+    status: entry.status,
+    statusText: entry.statusText,
+    timeMs: entry.timeMs,
+    size: entry.size,
+    body: entry.body,
+    headers: entry.headers || [],
+    at: (entry.at instanceof Date ? entry.at : new Date()).toISOString(),
+  };
+  const res = await addSavedResponse(saved);
+  if (!res.ok) { flashEnc("Response is too large to save (over the ~4 MB budget).", true); return; }
+  savedResponses = res.list;
+  scheduleBackup();
+  flashEnc(`Saved response “${name}” ✓${res.evicted ? ` — evicted ${res.evicted} oldest` : ""}`);
+  if (!els.savedPanel.hidden) renderSavedPanel();
+}
+
+// Re-decrypt the stored raw body with the current key and show it in the viewer.
+async function viewSavedResponse(saved) {
+  const candidates = [saved.body, saved.body.trim(), stripQuotes(saved.body), safeDecode(saved.body)];
+  const decRes = saved.body ? await CipherNetCrypto.tryDecryptAuto(candidates, state.key, state.iv) : null;
+  const entry = { ...saved, decRes, at: new Date(saved.at), _savedId: saved.id };
+  respTab = "body";
+  renderResponseView(entry);
+  closePanels();
+  flashEnc(`Viewing saved “${saved.name}”`);
+}
+
+function renameSaved(saved) {
+  const next = (prompt("Rename saved response:", saved.name) || "").trim();
+  if (!next || next === saved.name) return;
+  saved.name = next;
+  updateSavedResponses(savedResponses);
+  scheduleBackup();
+  renderSavedPanel();
+}
+function deleteSaved(saved) {
+  savedResponses = savedResponses.filter((s) => s !== saved);
+  updateSavedResponses(savedResponses);
+  scheduleBackup();
+  renderSavedPanel();
+}
+
+function renderSavedPanel() {
+  const panel = els.savedPanel;
+  panel.innerHTML = "";
+  const actions = el("div", "hist-actions");
+  actions.appendChild(el("span", "muted", `Saved Responses (${savedResponses.length})`));
+  panel.appendChild(actions);
+
+  if (!savedResponses.length) {
+    panel.appendChild(el("div", "muted-block", "No saved responses yet — send a request, then click 📌 Save on the response."));
+    return;
+  }
+  for (const s of savedResponses) {
+    const ok = s.status >= 200 && s.status < 400;
+    const row = el("div", "hist-row");
+    row.append(
+      el("span", "rhist-method", s.method),
+      el("span", "rhist-status " + (ok ? "ok" : "bad"), String(s.status || "—")),
+      el("span", "rhist-url", s.name),
+      el("span", "rhist-time", fmtSize(s.size))
+    );
+    const ren = el("button", "tree-rename", "✎");
+    ren.title = "Rename";
+    ren.addEventListener("click", (e) => { e.stopPropagation(); renameSaved(s); });
+    const del = el("button", "tree-del", "🗑");
+    del.title = "Delete saved response";
+    del.addEventListener("click", (e) => { e.stopPropagation(); deleteSaved(s); });
+    row.append(ren, del);
+    row.addEventListener("click", () => viewSavedResponse(s));
     panel.appendChild(row);
   }
 }
@@ -393,7 +853,7 @@ els.backupMenu.addEventListener("click", (e) => {
 });
 
 function downloadBackup() {
-  const blob = new Blob([backup.serialize(collections, history)], { type: "application/json" });
+  const blob = new Blob([backup.serialize(collections, history, environments, savedResponses)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -416,10 +876,15 @@ els.backupFile.addEventListener("change", async () => {
     const res = await backup.restoreFromText(await file.text());
     collections = res.collections;
     history = res.history;
+    environments = res.environments;
+    if (activeEnv && !environments[activeEnv]) activeEnv = "";
+    savedResponses = res.savedResponses;
     currentRef = null;
     currentSnapshot = null;
+    updateEnvLabel();
+    renderOpenPanels();
     checkDirty();
-    flashEnc(`Restored ${res.requests} request(s) in ${res.folders} folder(s) and ${res.history.length} history entries ✓`);
+    flashEnc(`Restored ${res.requests} request(s) in ${res.folders} folder(s), ${res.history.length} history, ${Object.keys(res.environments).length} env(s), ${res.savedResponses.length} saved response(s) ✓`);
   } catch (err) {
     flashEnc(`Restore failed: ${err.message || err}`, true);
   }
@@ -537,6 +1002,7 @@ function renderParamsFromUrl() {
   }
   els.encParamsBody.appendChild(makeParamRow()); // trailing "add" row
   updateReqTabIndicators();
+  refreshUrlHighlight();
 }
 // Rebuild the URL's query from the table (the table is the source of truth while
 // the user edits params); keeps one empty trailing row like Postman.
@@ -556,6 +1022,7 @@ function syncUrlFromParams() {
   ensureTrailing(els.encParamsBody, () => makeParamRow());
   checkDirty(); // editing params changes the URL → maybe mark the request dirty
   updateReqTabIndicators();
+  refreshUrlHighlight();
 }
 els.encParamsBody.addEventListener("input", syncUrlFromParams);
 els.encParamsBody.addEventListener("change", syncUrlFromParams);
@@ -687,9 +1154,10 @@ function reasonPhrase(code) {
 // The chosen HTTP method, custom Headers and Bearer Token are all applied as-is.
 async function sendRequest(mode) {
   applyOpenBulk(); // fold any open Bulk Edit box back into the tables first
-  const rawUrl = els.encUrl.value.trim();
-  const rawBody = els.encBody.value;
-  const token = els.encToken.value.trim();
+  // Substitute {{env vars}} first (the editors keep the {{name}} literal).
+  const rawUrl = resolveVars(els.encUrl.value).trim();
+  const rawBody = resolveVars(els.encBody.value);
+  const token = resolveVars(els.encToken.value).trim();
   const method = els.encMethod.value;
   els.encResponse.hidden = true;
   els.encResponse.innerHTML = "";
@@ -720,7 +1188,7 @@ async function sendRequest(mode) {
 
   // Custom headers first, then auth + Content-Type (unless the user set their own).
   const headers = {};
-  for (const h of getHeaders()) if (h.enabled && h.key.trim() !== "") headers[h.key.trim()] = h.value;
+  for (const h of getHeaders()) if (h.enabled && h.key.trim() !== "") headers[resolveVars(h.key).trim()] = resolveVars(h.value);
   if (els.authType.value === "bearer" && token) {
     headers["Authorization"] = /^bearer\s/i.test(token) ? token : "Bearer " + token;
   }
@@ -759,7 +1227,9 @@ async function sendRequest(mode) {
     });
     respTab = "body";
     renderResponseView(entry);
-    flashEnc("");
+    // Heads-up if any {{vars}} weren't defined in the active environment.
+    const missing = unresolvedVars([rawUrl, rawBody, token, ...Object.keys(headers), ...Object.values(headers)]);
+    flashEnc(missing.length ? `Sent — unresolved ${missing.join(" ")} (no ${activeEnv ? "such var" : "environment"})` : "");
   } catch (e) {
     flashEnc("Request failed: " + (e.message || e), true);
   }
@@ -783,7 +1253,7 @@ function renderResponseView(entry) {
   meta.appendChild(el("span", "resp-dim", fmtTime(entry.timeMs)));
   meta.appendChild(el("span", "resp-dim", fmtSize(entry.size)));
   meta.appendChild(el("span", "resp-dim", `${entry.method} ${entry.url}`));
-  meta.appendChild(respCopyControl(entry)); // 📋 Copy the sent URL / body / headers
+  meta.appendChild(respActions(entry)); // 📌 Save (unless already saved) + 📋 Copy
   els.encResponse.appendChild(meta);
 
   const tabs = el("div", "resp-tabs");
@@ -820,6 +1290,23 @@ function curlText(entry) {
   if (entry.reqBody) parts.push(`--data '${entry.reqBody}'`);
   return parts.join(" \\\n  ");
 }
+// Right-aligned action cluster on the response meta line: 📌 Save (unless the
+// response is already a saved one) + the 📋 Copy dropdown.
+function respActions(entry) {
+  const wrap = el("div", "resp-actions");
+  if (!entry._savedId) {
+    const save = el("button", "resp-copy resp-save", "📌 Save");
+    save.type = "button";
+    save.title = "Save this response (full body) to disk to revisit later";
+    save.addEventListener("click", (e) => { e.stopPropagation(); saveCurrentResponse(entry); });
+    wrap.appendChild(save);
+  } else {
+    wrap.appendChild(el("span", "resp-saved-tag", "🗂 saved"));
+  }
+  wrap.appendChild(respCopyControl(entry));
+  return wrap;
+}
+
 // A "📋 Copy ▾" dropdown for the response meta line: URL / Body / Headers / cURL /
 // Response. Each item copies the sent request (encrypted when Send Encrypted was used).
 function respCopyControl(entry) {

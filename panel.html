@@ -16,6 +16,10 @@
         <span id="encTools" class="enc-tools" hidden>
           <span class="sep"></span>
           <div class="menu-wrap">
+            <button id="envBtn" class="ghost" title="Environments — use {{name}} in the URL, headers, body or token">🌎 <span id="envLabel">No Env</span> ▾</button>
+            <div id="envPanel" class="pop-panel env-panel" hidden></div>
+          </div>
+          <div class="menu-wrap">
             <button id="collectionBtn" class="ghost" title="Browse saved collections (folders &amp; APIs)">📚 Collection</button>
             <div id="collectionPanel" class="pop-panel tree-panel" hidden></div>
           </div>
@@ -36,6 +40,10 @@
             <button id="historyBtn" class="ghost" title="Browse the last 100 sent requests">🕘 History</button>
             <div id="historyPanel" class="pop-panel tree-panel" hidden></div>
           </div>
+          <div class="menu-wrap">
+            <button id="savedBtn" class="ghost" title="Saved responses — full response bodies kept on disk">🗂 Saved</button>
+            <div id="savedPanel" class="pop-panel tree-panel" hidden></div>
+          </div>
           <button id="saveReqBtn" title="Save changes to the loaded request" hidden>💾 Save</button>
           <div class="menu-wrap">
             <button id="backupBtn" class="ghost" title="Keep collections &amp; history in a file so they survive removing the extension">🗄 Backup ▾</button>
@@ -46,6 +54,8 @@
               <button data-act="restore">Restore from file…</button>
               <button data-act="download">Download a copy</button>
               <button data-act="unlink" hidden>Stop auto-saving</button>
+              <div class="menu-sep"></div>
+              <div class="menu-note">Holds collections, history, environments &amp; saved responses — including any Bearer tokens and response bodies. Keys and IVs are never written.</div>
             </div>
           </div>
           <input id="backupFile" type="file" accept="application/json,.json" hidden />
@@ -122,7 +132,11 @@
               <option value="HEAD">HEAD</option>
               <option value="OPTIONS">OPTIONS</option>
             </select>
-            <input id="encUrl" class="req-url" type="text" spellcheck="false" placeholder="Enter request URL — e.g. https://api.company.com/path?foo=bar" />
+            <div class="var-field">
+              <div id="encUrlHl" class="var-highlight" aria-hidden="true"></div>
+              <input id="encUrl" class="req-url" type="text" spellcheck="false" placeholder="Enter request URL — e.g. https://api.company.com/path?foo=bar or {{baseUrl}}/path" />
+              <div id="varSuggest" class="var-suggest" hidden></div>
+            </div>
           </div>
           <button id="sendEncryptBtn" class="req-send req-send-enc" title="Encrypt the query string and body, then send">Send Encrypted</button>
           <button id="sendPlainBtn" class="req-send req-send-plain" title="Send the request exactly as entered (no encryption)">Send Plain</button>

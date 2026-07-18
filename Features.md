@@ -1,4 +1,4 @@
-**Version:** 2.17.2 | **Last Modified:** 2026-07-18
+**Version:** 2.19.0 | **Last Modified:** 2026-07-18
 
 # Features
 
@@ -14,15 +14,36 @@
 - **Reset columns** — restore default layout and visibility
 
 ## Collections (Saved Requests)
-- **Add request** — name a request (API name) and assign it to a folder, then save URL/body/token
+- **Add request** — name a request (API name) and assign it to a folder, then save method/URL/headers/body/token
 - **Collection tree** — dropdown showing all folders and requests in a tree view
 - **Delete folder** — remove a folder and all its requests (with 🗑 button)
 - **Delete request** — remove a single saved request (with 🗑 button)
 - **Load request** — click any API in the tree to load it into the API Testing tool
 - **Rename folder** — rename a folder (with ✎ button)
 - **Rename request** — rename a saved API request (with ✎ button)
-- **Save button** — update a previously saved request after modifying it
-- **Save request** — persist URLs, payloads, and Bearer tokens via `chrome.storage.sync` (see **Backup & Restore** for surviving removal of the extension)
+- **Save button** — update a previously saved request after modifying it (its favorite/color/tags/note are preserved)
+- **Save request** — persist requests and Bearer tokens via `chrome.storage.sync` (see **Backup & Restore** for surviving removal of the extension)
+- **Favorite ★** — star a request; favorites float to the top of their folder
+- **Colour tag** — click the swatch to cycle a colour; the request row gets a matching left border (triage at a glance)
+- **Tags** — attach comma-separated tags (🏷), shown as chips on the request row
+- **Note** — attach a free-text note (📝) to a request; shown on hover, indicator lights when present
+- **Rides along in backup** — favorite/colour/tags/note live inside the collection entry, so they persist in sync and in the backup file automatically
+
+## Environments ({{variables}})
+- **🌎 Environment switcher** — pick an active environment in the API Testing toolbar (turns green when one is active); "No Environment" disables substitution
+- **{{name}} substitution** — reference variables as `{{name}}` anywhere in the URL, headers, body, or Bearer token; they're resolved at **send time** (the editors keep the `{{name}}` literal, so it's non-destructive and reusable)
+- **Manage in place** — create / rename / delete environments and edit their `name → value` variables in one pop-panel
+- **Colour-highlighted in the URL** — `{{name}}` renders in a distinct colour right in the URL field: blue when the active environment defines it, red when it doesn't
+- **Autocomplete** — type `{{` in the URL and a dropdown of the active environment's variables (name + value) appears; ↑/↓ to move, Enter/Tab or click to insert, Esc to dismiss
+- **Unresolved heads-up** — after a send, any `{{name}}` not defined in the active environment is called out in the status line
+- **Persisted + backed up** — environments live in `chrome.storage.sync` and are also written to the linked backup file, so they survive a remove/re-add
+
+## Saved Responses
+- **📌 Save response** — on the response meta line; keeps the **full** response body plus the request that produced it
+- **🗂 Saved panel** — browse saved responses (method · status · name · size); click to re-open, ✎ rename, 🗑 delete
+- **Re-decrypted on view** — only the raw body is stored (never the decrypted plaintext); it's decrypted again with the current key when you open it (PRD §24)
+- **Kept on disk + backed up** — stored in `chrome.storage.local` (far bigger than the sync history quota), capped by count and ~4 MB total with oldest-first eviction, and mirrored into the linked backup file
+- **Complements History** — Request History logs every send as a lightweight summary; Saved Responses is the deliberate, full-body keep
 
 ## Request History
 - **🕘 History button** — beside ➕ Add in the API Testing toolbar; opens a dropdown of the last 100 sent requests, newest first
@@ -31,17 +52,18 @@
 - **Per-entry delete + Clear all** — remove one entry (🗑) or clear the whole log
 - **Compact by design** — stores the request (URL/body/token) and a response summary (status/size/time), not the full response body, to stay well inside chrome.storage.sync's 100 KB/8 KB-per-item quota across 100 entries
 
-## Backup & Restore (Collections + History)
+## Backup & Restore (Collections, History, Environments & Saved Responses)
 - **Why it exists** — Chrome erases an extension's storage, `local` **and** `sync` alike, when the extension is removed. (Synced settings only come back for Web Store installs on a signed-in profile; a sideloaded build gets nothing back.) A file on disk is the only copy that survives.
 - **🗄 Backup menu** — in the API Testing toolbar; shows whether a backup file is linked and whether Chrome still permits writing to it
-- **Link backup file** — pick a file once; Collections and History are written to it from then on
-- **Automatic save** — every add / rename / delete / send writes the file (debounced), so it never lags behind the live store
+- **Link backup file** — pick a file once; Collections, History, Environments and Saved Responses are written to it from then on
+- **Automatic save** — every add / rename / delete / send / environment edit / response save writes the file (debounced), so it never lags behind the live store
 - **Automatic pull on load** — each time the panel opens, the linked file is read and merged back in, with no interaction
-- **Restore after re-adding the extension** — re-add, open 🗄 Backup → *Link backup file…* → **Open existing backup**, and every folder, request and history entry comes back
-- **Restore from file** — merge any backup copy into the current Collections/History (plain file picker, works in the panel)
-- **Download a copy** — one-off snapshot, e.g. to move Collections to another machine
-- **Non-destructive merges** — a restore unions folders and requests rather than replacing them; history is de-duplicated by timestamp
-- **Keys are never backed up** — AES keys and IVs stay in `chrome.storage` and are never written to the file (PRD §24). The file *does* contain any Bearer tokens saved with a request, so it's kept wherever the user chose to put it.
+- **Restore after re-adding the extension** — re-add, open 🗄 Backup → *Link backup file…* → **Open existing backup**, and every folder, request, history entry, environment and saved response comes back
+- **Restore from file** — merge any backup copy into the current data (plain file picker, works in the panel)
+- **Download a copy** — one-off snapshot, e.g. to move your setup to another machine
+- **Non-destructive merges** — a restore unions folders/requests/environments rather than replacing them; history is de-duplicated by timestamp and saved responses by id
+- **v1 files still load** — older backups (Collections + History only) restore fine; the new fields default empty
+- **Keys are never backed up** — AES keys and IVs stay in `chrome.storage` and are never written to the file (PRD §24). The file *does* contain Bearer tokens (saved with a request, and in environment variables) and full response bodies, so it's kept wherever the user chose to put it — the 🗄 Backup menu says so.
 
 ## Decryption
 - **Auto-lenient mode** — when strict decryption fails, automatically retry by trimming to whole 16-byte blocks without PKCS7 validation
@@ -73,6 +95,8 @@ Postman-style request builder: a `[method ▾] [ URL ] [Send ▾]` request line 
 - **Request line** — HTTP method dropdown (GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS), URL field, and two Send buttons side by side
 - **Send Encrypted / Send Plain buttons** — green **Send Encrypted** (AES-encrypt the query string and body first) and purple **Send Plain** (send as-is), shown side by side
 - **📋 Copy menu** — on the response meta line; copies what was actually **sent** (encrypted, when Send Encrypted was used): **URL**, **Body**, **Headers**, **as cURL**, or the **Response** body
+- **📌 Save response** — keep the full response body to revisit later (see **Saved Responses**)
+- **{{env vars}}** — `{{name}}` in the URL / headers / body / token resolves from the active environment at send time (see **Environments**)
 - **Method auto-bump** — typing a body while the method is GET bumps it to POST so bodies aren't silently dropped (GET/HEAD never carry a body)
 - **Params tab** — Postman-style query editor (enable checkbox · Key · Value · Description), two-way bound to the URL
 - **Authorization tab** — No Auth / Bearer Token; the token is sent as `Authorization` as-is (prepended with `Bearer ` if omitted), never encrypted

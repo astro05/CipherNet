@@ -296,12 +296,78 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   font-weight: 600;
   font-family: Consolas, monospace;
 }
+/* The URL is an overlay field: a highlight backdrop renders the text (with
+   {{vars}} coloured) while the real input sits on top with transparent text so
+   only its caret shows. The .var-field carries the input's border/background. */
+.var-field {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0 4px 4px 0;
+}
 #toolbar #encUrl {
   flex: 1 1 auto;
   min-width: 0;
-  border-radius: 0 4px 4px 0;
+  height: 26px;
+  line-height: 26px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--fg);
+  position: relative;
+  z-index: 1;
   font-family: Consolas, monospace;
 }
+#toolbar #encUrl::placeholder { color: var(--muted); }
+.var-highlight {
+  position: absolute;
+  inset: 0;
+  padding: 0 7px;
+  white-space: pre;
+  overflow: hidden;
+  color: var(--fg);
+  pointer-events: none;
+  font: 12px/26px Consolas, monospace;
+}
+.var-token { color: #2563eb; font-weight: 600; }
+.var-token.unknown { color: var(--err); }
+:root[data-theme="light"] .var-token { color: #1a73e8; }
+
+/* {{var}} autocomplete dropdown, anchored under the URL field */
+.var-suggest {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  min-width: 220px;
+  max-width: 360px;
+  max-height: 200px;
+  overflow: auto;
+  z-index: 40;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: var(--shadow);
+  padding: 3px;
+}
+.var-suggest[hidden] { display: none; }
+.var-suggest-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: Consolas, monospace;
+}
+.var-suggest-item.active, .var-suggest-item:hover { background: var(--hover); }
+.vs-name { color: var(--tok-key); flex: 0 0 auto; }
+.vs-val { color: var(--muted); flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* Send Encrypted (green) + Send Plain (purple) — solid fills, white text. */
 #toolbar .req-send {
   flex: 0 0 auto;
@@ -392,7 +458,7 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .pop-actions { display: flex; gap: 8px; margin-top: 4px; }
 
 /* Collection tree (folders → APIs) with per-row delete */
-.tree-panel { max-height: 340px; overflow: auto; min-width: 280px; padding: 4px; }
+.tree-panel { max-height: 340px; overflow: auto; min-width: 340px; padding: 4px; }
 .tree-folder { display: flex; align-items: center; gap: 6px; padding: 4px 4px; font-weight: 600; }
 .tree-api {
   display: flex;
@@ -405,12 +471,45 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .tree-api:hover { background: var(--hover); }
 .tree-api.active { background: var(--sel); color: var(--sel-fg); }
 .tree-ic { flex: 0 0 auto; color: var(--muted); }
-.tree-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-name { flex: 1 1 auto; min-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-empty { color: var(--muted); padding: 2px 4px 4px 20px; font-size: 11px; }
 .tree-rename, .tree-del { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 0 4px; font-size: 12px; line-height: 1; }
 .tree-rename:hover { color: var(--accent); }
 .tree-del:hover { color: var(--err); }
+.tree-rename.has-note { color: var(--accent); }
+/* per-request metadata controls in the collection tree (scoped to #toolbar so
+   they outrank the generic #toolbar button padding/border) */
+#toolbar .tree-star { background: transparent; border: none; cursor: pointer; padding: 0 2px; font-size: 12px; line-height: 1; color: var(--muted); flex: 0 0 auto; }
+#toolbar .tree-star.on { color: #f59e0b; }
+#toolbar .tree-swatch { width: 12px; height: 12px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: transparent; cursor: pointer; flex: 0 0 auto; }
+.tree-tags { display: flex; gap: 3px; flex-wrap: wrap; flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.tag-chip { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 0 6px; font-size: 10px; color: var(--muted); white-space: nowrap; }
 #encStatus.err { color: var(--err); }
+
+/* Environments pop-panel ({{vars}} switcher + variable editor) */
+#toolbar #envBtn.env-on { color: var(--ok); border-color: var(--ok); }
+.env-panel { min-width: 300px; max-height: 420px; overflow: auto; }
+.env-list { display: flex; flex-direction: column; gap: 1px; margin-bottom: 6px; }
+.env-row { display: flex; align-items: center; gap: 6px; padding: 3px 4px; cursor: pointer; border-radius: 3px; }
+.env-row:hover { background: var(--hover); }
+.env-row.active { background: var(--sel); color: var(--sel-fg); }
+.env-radio { flex: 0 0 auto; color: var(--muted); width: 12px; text-align: center; }
+.env-row.active .env-radio { color: inherit; }
+.env-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.env-add { display: flex; gap: 6px; margin: 4px 0; }
+.env-new { flex: 1 1 auto; min-width: 0; }
+.env-vars-title { font-size: 11px; margin: 4px 0; }
+.env-vars { display: flex; flex-direction: column; gap: 3px; }
+.env-var-row { display: grid; grid-template-columns: 1fr 1fr 20px; gap: 4px; align-items: center; }
+.env-var-name, .env-var-val {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 5px;
+  min-width: 0;
+  font-family: Consolas, monospace;
+}
 .enc-output { display: flex; flex-direction: column; gap: 6px; }
 .enc-output[hidden] { display: none; }
 .enc-out-row { display: flex; align-items: baseline; gap: 8px; }
@@ -531,8 +630,10 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .resp-dim { color: var(--muted); word-break: break-all; }
 .resp-bar { display: flex; gap: 6px; }
 
-/* 📋 Copy dropdown on the response meta line (URL / Body / Headers / cURL / Response) */
-.resp-copy-wrap { margin-left: auto; flex: 0 0 auto; }
+/* Right-aligned actions on the response meta line: 📌 Save + 📋 Copy */
+.resp-actions { margin-left: auto; flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+.resp-saved-tag { color: var(--muted); font-size: 11px; }
+.resp-copy-wrap { flex: 0 0 auto; }
 #toolbar .resp-copy { padding: 2px 8px; font-family: inherit; }
 /* Anchor to the button's right edge so the menu opens inward (it sits far right). */
 .resp-copy-menu { min-width: 150px; left: auto; right: 0; }

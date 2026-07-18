@@ -22,6 +22,8 @@ export const els = {
   encryptRow: document.getElementById("encryptRow"),
   encMethod: document.getElementById("encMethod"),
   encUrl: document.getElementById("encUrl"),
+  encUrlHl: document.getElementById("encUrlHl"),   // {{var}} highlight backdrop
+  varSuggest: document.getElementById("varSuggest"), // {{var}} autocomplete dropdown
   encBody: document.getElementById("encBody"),
   encryptClear: document.getElementById("encryptClear"),
   encStatus: document.getElementById("encStatus"),
@@ -44,6 +46,10 @@ export const els = {
   encHeadersBody: document.getElementById("encHeadersBody"),
   headersBulk: document.getElementById("headersBulk"),
   encResponse: document.getElementById("encResponse"),
+  // environments: toolbar switcher + its pop-panel (Postman-style {{vars}})
+  envBtn: document.getElementById("envBtn"),
+  envLabel: document.getElementById("envLabel"),
+  envPanel: document.getElementById("envPanel"),
   // collections: toolbar tools (Collection / Add / Save) + their pop-panels
   encTools: document.getElementById("encTools"),
   collectionBtn: document.getElementById("collectionBtn"),
@@ -58,6 +64,9 @@ export const els = {
   saveReqBtn: document.getElementById("saveReqBtn"),
   historyBtn: document.getElementById("historyBtn"),
   historyPanel: document.getElementById("historyPanel"),
+  // saved responses (full bodies kept in chrome.storage.local)
+  savedBtn: document.getElementById("savedBtn"),
+  savedPanel: document.getElementById("savedPanel"),
   // backup: mirrors collections + history to a file so they survive uninstall
   backupBtn: document.getElementById("backupBtn"),
   backupMenu: document.getElementById("backupMenu"),
