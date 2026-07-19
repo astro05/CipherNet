@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "CipherNet",
-  "version": "2.19.2",
-  "description": "Encrypts and Decrypts CipherNet API request payloads. © joyultimates@gmail.com",
+  "version": "2.19.4",
+  "description": "Encrypts and Decrypts CipherNet API request payloads. © Md Moniruzzaman Joy",
   "minimum_chrome_version": "116",
   "devtools_page": "devtools.html",
   "background": { "service_worker": "background.js", "type": "module" },

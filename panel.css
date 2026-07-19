@@ -321,7 +321,7 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   caret-color: var(--fg);
   position: relative;
   z-index: 1;
-  font-family: Consolas, monospace;
+  font: 12px/26px Consolas, monospace;
 }
 #toolbar #encUrl::placeholder { color: var(--muted); }
 .var-highlight {

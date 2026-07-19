@@ -29,6 +29,7 @@ export const state = {
     matchIds: null,   // Set of matching ids, or null when no search
     total: 0,
     idx: 0,
+    matchIdx: -1,     // index of the "current" <mark> within the open detail pane
     opts: { regex: false, caseSensitive: false, wholeWord: false },
   },
   // §26 layout (persisted): list-pane width + per-column order/widths/visibility.

@@ -23,6 +23,10 @@ function closeSearch() {
   state.search.matchIds = null;
   state.search.ids = [];
   state.search.total = 0;
+  state.search.matchIdx = -1;
+  paneMarks = [];
+  pendingNav = null;
+  pendingTabsToTry = null;
   els.searchStatus.textContent = "";
   applyFilter();
   if (state.selectedId != null) renderDetail();
@@ -52,6 +56,8 @@ async function ensureSearchable(entry) {
 
 let searchSeq = 0;
 export async function runSearch() {
+  pendingNav = null;
+  pendingTabsToTry = null;
   const opts = state.search.opts;
   const query = els.searchInput.value;
   const re = buildMatcher(query, opts);
@@ -91,11 +97,69 @@ export async function runSearch() {
 }
 export const searchDebounced = debounce(runSearch, 200);
 
+// Tabs whose rendered content can contain free text worth searching (skips
+// Timing, which is just bar charts).
+const SEARCHABLE_TABS = ["headers", "payload", "preview", "response", "cookies", "initiator"];
+
+// <mark class="hl"> elements in the currently rendered detail pane, in
+// document order — rebuilt from scratch by highlightDetail() on every render.
+let paneMarks = [];
+// Set by navSearch() right before it switches entry/tab, so the next
+// highlight pass knows where to place the cursor once it lands.
+let pendingNav = null; // "first" | "last" | null
+// Remaining tabs to try, in case the tab we land on has no matches for this
+// entry (its match lives in a different tab, e.g. a header value).
+let pendingTabsToTry = null;
+
+function setCurrentMark(idx, scroll) {
+  const prev = paneMarks[state.search.matchIdx];
+  if (prev) prev.classList.remove("current");
+  state.search.matchIdx = idx;
+  const mark = paneMarks[idx];
+  if (!mark) return;
+  mark.classList.add("current");
+  if (scroll) mark.scrollIntoView({ block: "center" });
+}
+
+// After a render + highlight pass, decide whether to plant the "current"
+// match cursor here, or — if this pane came up empty mid-navigation — hop to
+// the next tab that might hold the match.
+function placeCursorAfterRender() {
+  if (paneMarks.length) {
+    const idx = pendingNav === "last" ? paneMarks.length - 1 : 0;
+    const scroll = pendingNav != null;
+    pendingNav = null;
+    pendingTabsToTry = null;
+    setCurrentMark(idx, scroll);
+    return;
+  }
+  state.search.matchIdx = -1;
+  if (!pendingNav || !pendingTabsToTry) return;
+  pendingTabsToTry = pendingTabsToTry.filter((t) => t !== state.activeTab);
+  const next = pendingTabsToTry[0];
+  if (!next) { pendingNav = null; pendingTabsToTry = null; return; }
+  const btn = els.detailTabs.querySelector(`[data-tab="${next}"]`);
+  if (btn) btn.click(); // re-enters renderDetail() -> highlightDetail() -> here
+  else { pendingNav = null; pendingTabsToTry = null; }
+}
+
 function navSearch(dir) {
   const ids = state.search.ids;
   if (!ids.length) return;
+
+  // Step within the matches already visible in the open detail pane first.
+  if (paneMarks.length) {
+    const atEnd = dir > 0 && state.search.matchIdx >= paneMarks.length - 1;
+    const atStart = dir < 0 && state.search.matchIdx <= 0;
+    if (!atEnd && !atStart) { setCurrentMark(state.search.matchIdx + dir, true); return; }
+    if (ids.length <= 1) { setCurrentMark(dir > 0 ? 0 : paneMarks.length - 1, true); return; }
+  }
+
+  // Exhausted this pane (or it has no marks) — move to the next/prev matching request.
   state.search.idx = (state.search.idx + dir + ids.length) % ids.length;
   const id = ids[state.search.idx];
+  pendingNav = dir > 0 ? "first" : "last";
+  pendingTabsToTry = SEARCHABLE_TABS.slice();
   selectEntry(id);
   const e = state.byId.get(id);
   if (e && e.row) e.row.scrollIntoView({ block: "nearest" });
@@ -104,7 +168,8 @@ function navSearch(dir) {
 // Wrap search matches in <mark> inside the open detail pane.
 function highlightDetail() {
   const re = state.search.regex;
-  if (!re) return;
+  paneMarks = [];
+  if (!re) { state.search.matchIdx = -1; return; }
   const walker = document.createTreeWalker(els.detailContent, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
@@ -129,15 +194,18 @@ function highlightDetail() {
       mark.className = "hl";
       mark.textContent = m[0];
       frag.appendChild(mark);
+      paneMarks.push(mark);
       last = m.index + m[0].length;
       if (m[0] === "") re.lastIndex++; // guard against zero-length matches
     }
     if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
     node.parentNode.replaceChild(frag, node);
   }
+  placeCursorAfterRender();
 }
 export function maybeHighlight() {
   if (state.search.active && state.search.regex) highlightDetail();
+  else { paneMarks = []; state.search.matchIdx = -1; }
 }
 
 /* ------------------------------- wiring ------------------------------- */
