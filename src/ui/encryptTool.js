@@ -8,7 +8,7 @@ import { state } from "../core/state.js";
 import { els } from "../core/els.js";
 import { el } from "../core/dom.js";
 import { CipherNetCrypto } from "../core/crypto.js";
-import { safeDecode, fmtTime, fmtSize, stripQuotes, statusPhrase, statusTitle } from "../core/format.js";
+import { safeDecode, fmtTime, fmtSize, stripQuotes, statusPhrase, statusTitle, escapeHtml } from "../core/format.js";
 import {
   getCollections, setCollections, loadHistory, addHistoryEntry, removeHistoryEntry, clearHistory,
   getEnvironments, setEnvironments,
@@ -275,10 +275,8 @@ function deleteEnv(name) {
 /* ---- URL field: {{var}} colour highlight + autocomplete ---- */
 // A backdrop <div> mirrors the URL text with {{name}} wrapped in coloured spans
 // (blue when defined in the active env, red when not); the real input sits on top
-// with transparent text so only its caret shows.
-function escapeHtml(s) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+// with transparent text so only its caret shows. escapeHtml is shared from
+// core/format.js (identical behaviour, with a defensive String() coercion).
 function highlightVarsHtml(text) {
   const vars = (activeEnv && environments[activeEnv]) || {};
   const re = /\{\{\s*([\w.$-]+)\s*\}\}/g;
