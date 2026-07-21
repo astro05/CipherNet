@@ -9,7 +9,7 @@ import { formatBody, prettyText, escapeHtml, safeDecode, fmtTime } from "../core
 import { fetchContent } from "../services/capture.js";
 import { maybeHighlight } from "../services/search.js";
 import { saveSettings } from "../services/storage.js";
-import { jsonTableView } from "./jsonTable.js";
+import { jsonTableView, jsonTreeView, jsonCodeView } from "./jsonTable.js";
 
 let renderSeq = 0;
 function stale(seq) {
@@ -246,7 +246,8 @@ async function renderResponse(entry, seq) {
   s.appendChild(bodyView(res.ok ? res.text : null, raw, res));
 }
 
-/* A <pre> body view with a decrypted/raw toggle, a JSON table Preview, + copy. */
+/* A <pre> body view with a decrypted/raw toggle, a JSON table Preview, a
+   collapsible JSON Tree (fold/unfold + total object/array/value count), + copy. */
 export function bodyView(decrypted, raw, res) {
   const container = el("div");
   const bar = el("div", "dsection-title");
@@ -255,17 +256,26 @@ export function bodyView(decrypted, raw, res) {
   const toggle = el("button", "linkbtn");
   bar.appendChild(toggle);
 
-  // Preview: offer a sortable / filterable table view beside the raw/decrypted
-  // toggle whenever there's JSON to show it for. Falls back to the raw text
-  // when there's no decrypted text (e.g. a response that was never encrypted
-  // in the first place) so Preview is available in that case too.
-  const tableNode = jsonTableView(decrypted != null ? decrypted : raw);
-  let preview = null;
+  // Preview / Tree: offer a sortable/filterable table and a collapsible tree
+  // beside the raw/decrypted toggle whenever there's JSON to show them for.
+  // Falls back to the raw text when there's no decrypted text (e.g. a
+  // response that was never encrypted in the first place) so both stay
+  // available in that case too.
+  const bodyText = decrypted != null ? decrypted : raw;
+  const tableNode = jsonTableView(bodyText);
+  const treeNode = jsonTreeView(bodyText);
+  let preview = null, treeBtn = null;
   if (tableNode) {
     preview = el("button", "linkbtn", "Preview");
     preview.title = "Show as a sortable / filterable table";
     tableNode.hidden = true;
     bar.appendChild(preview);
+  }
+  if (treeNode) {
+    treeBtn = el("button", "linkbtn", "Tree");
+    treeBtn.title = "Show as a collapsible tree with object/array counts";
+    treeNode.hidden = true;
+    bar.appendChild(treeBtn);
   }
 
   const copy = el("button", "linkbtn", "Copy");
@@ -274,41 +284,65 @@ export function bodyView(decrypted, raw, res) {
 
   const pre = el("pre", "body");
   container.appendChild(pre);
+  // The default raw/decrypted display: a line-numbered, per-line-foldable
+  // code view when that text is JSON (built fresh per render since raw and
+  // decrypted can each independently be JSON or not), falling back to the
+  // plain `pre` above for non-JSON text and the decrypt-error case.
+  const codeHolder = el("div");
+  codeHolder.hidden = true;
+  container.appendChild(codeHolder);
   if (tableNode) container.appendChild(tableNode);
+  if (treeNode) container.appendChild(treeNode);
 
   let showingRaw = decrypted == null;
   let showTable = false;
+  let showTree = false;
   function render() {
     if (tableNode) {
       tableNode.hidden = !showTable;
       preview.classList.toggle("active", showTable);
     }
-    pre.style.display = showTable ? "none" : "";
+    if (treeNode) {
+      treeNode.hidden = !showTree;
+      treeBtn.classList.toggle("active", showTree);
+    }
     // Keep the raw/decrypted toggle visible & correctly labelled even while the
-    // Preview table is shown, so users can jump straight back to raw/decrypted.
+    // Preview table or Tree is shown, so users can jump straight back to raw/decrypted.
     const rawMode = showingRaw || decrypted == null;
     toggle.textContent = rawMode ? "View decrypted" : "View raw";
-    if (showTable) return;
+    if (showTable || showTree) {
+      pre.style.display = "none";
+      codeHolder.hidden = true;
+      return;
+    }
 
-    if (rawMode) {
-      if (decrypted == null && res && !res.ok) {
-        pre.classList.add("error");
-        pre.innerHTML =
-          `<span class="note">[could not decrypt: ${escapeHtml(res.error)}]\nShowing raw bytes:</span>\n\n` +
-          formatBody(raw || "(empty)");
-      } else {
-        pre.classList.remove("error");
-        pre.innerHTML = formatBody(raw || "(empty)");
-      }
+    const isErr = rawMode && decrypted == null && res && !res.ok;
+    const activeText = rawMode ? raw : decrypted;
+    const codeNode = isErr ? null : jsonCodeView(activeText || "");
+    if (codeNode) {
+      pre.style.display = "none";
+      codeHolder.innerHTML = "";
+      codeHolder.appendChild(codeNode);
+      codeHolder.hidden = false;
+      return;
+    }
+    codeHolder.hidden = true;
+    pre.style.display = "";
+    if (isErr) {
+      pre.classList.add("error");
+      pre.innerHTML =
+        `<span class="note">[could not decrypt: ${escapeHtml(res.error)}]\nShowing raw bytes:</span>\n\n` +
+        formatBody(raw || "(empty)");
     } else {
       pre.classList.remove("error");
-      pre.innerHTML = formatBody(decrypted);
+      pre.innerHTML = formatBody(activeText || "(empty)");
     }
   }
   render();
-  // Clicking the raw/decrypted toggle always leaves the Preview table view.
-  toggle.addEventListener("click", () => { showTable = false; showingRaw = !showingRaw; render(); });
-  if (preview) preview.addEventListener("click", () => { showTable = !showTable; render(); });
+  // Clicking the raw/decrypted toggle always leaves the Preview table / Tree view.
+  toggle.addEventListener("click", () => { showTable = false; showTree = false; showingRaw = !showingRaw; render(); });
+  if (preview) preview.addEventListener("click", () => { showTable = !showTable; showTree = false; render(); });
+  if (treeBtn) treeBtn.addEventListener("click", () => { showTree = !showTree; showTable = false; render(); });
   copy.addEventListener("click", () => {
     const text = showingRaw || decrypted == null ? raw || "" : decrypted;
     navigator.clipboard.writeText(prettyText(text)).then(() => {
@@ -340,52 +374,9 @@ function sourceToggle(raw, decrypted) {
 }
 
 /* ------------------------------- preview ------------------------------ */
-// JSON tree node with collapse/expand. Branches toggle on click; leaves are
-// colored by type.
-function buildTree(value, keyLabel) {
-  const node = el("div", "jt-node");
-  const isObj = value !== null && typeof value === "object";
-  if (isObj) {
-    const isArr = Array.isArray(value);
-    const entries = isArr ? value.map((v, i) => [i, v]) : Object.entries(value);
-    const row = el("div", "jt-row jt-branch");
-    const tri = el("span", "jt-tri", entries.length ? "▾" : "·");
-    row.appendChild(tri);
-    if (keyLabel != null) row.appendChild(el("span", "jt-key", keyLabel + ":"));
-    row.appendChild(el("span", "jt-meta", isArr ? `Array(${entries.length})` : `{${entries.length}}`));
-    const children = el("div", "jt-children");
-    for (const [k, v] of entries) children.appendChild(buildTree(v, String(k)));
-    node._open = true;
-    node._apply = () => {
-      if (!entries.length) return;
-      children.style.display = node._open ? "" : "none";
-      tri.textContent = node._open ? "▾" : "▸";
-    };
-    row.addEventListener("click", (e) => { e.stopPropagation(); node._open = !node._open; node._apply(); });
-    node.appendChild(row);
-    node.appendChild(children);
-  } else {
-    const row = el("div", "jt-row");
-    row.appendChild(el("span", "jt-tri-spacer"));
-    if (keyLabel != null) row.appendChild(el("span", "jt-key", keyLabel + ":"));
-    const type = value === null ? "null" : typeof value;
-    const cls =
-      type === "number" ? "tok-num" : type === "boolean" ? "tok-bool" : type === "null" ? "tok-null" : "tok-str";
-    const text = value === null ? "null" : type === "string" ? JSON.stringify(value) : String(value);
-    row.appendChild(el("span", cls, text));
-    node.appendChild(row);
-  }
-  return node;
-}
-function setTreeOpen(root, open) {
-  root.querySelectorAll(".jt-node").forEach((n) => { if (n._apply) { n._open = open; n._apply(); } });
-}
-
 async function renderPreview(entry, seq) {
   const { s, h } = section("Preview");
-  const ctrlBar = el("div", "preview-bar");
   const holder = el("div");
-  s.appendChild(ctrlBar);
   s.appendChild(holder);
   els.detailContent.appendChild(s);
   holder.appendChild(el("div", "muted-block", "Loading…"));
@@ -407,21 +398,10 @@ async function renderPreview(entry, seq) {
   const text = res.ok ? res.text : raw;
   if (res.ok) { entry.maybeEncrypted = entry.decrypted = true; h.appendChild(el("span", "sub", "decrypted")); }
 
-  let data, isJson = false;
   const trimmed = text.trim();
-  if (trimmed && (trimmed[0] === "{" || trimmed[0] === "[")) {
-    try { data = JSON.parse(trimmed); isJson = true; } catch {}
-  }
-  if (isJson) {
-    const exp = el("button", "linkbtn", "Expand all");
-    const col = el("button", "linkbtn", "Collapse all");
-    ctrlBar.appendChild(exp);
-    ctrlBar.appendChild(col);
-    const tree = el("div", "jt");
-    tree.appendChild(buildTree(data, null));
+  const tree = trimmed && (trimmed[0] === "{" || trimmed[0] === "[") ? jsonTreeView(trimmed) : null;
+  if (tree) {
     holder.appendChild(tree);
-    exp.addEventListener("click", () => setTreeOpen(tree, true));
-    col.addEventListener("click", () => setTreeOpen(tree, false));
   } else {
     const pre = el("pre", "body");
     pre.textContent = text;

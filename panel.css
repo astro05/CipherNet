@@ -935,6 +935,21 @@ mark.hl.current { background: var(--hl-cur-bg); color: var(--hl-cur-fg); }
 .jt-tri-spacer { width: 12px; flex: 0 0 auto; }
 .jt-key { color: var(--tok-key); }
 .jt-meta { color: var(--muted); }
+.jt-summary { color: var(--muted); font-size: 11px; margin-left: 4px; }
+.jtree-wrap { margin-top: 4px; }
+
+/* ------------------------- JSON code view (folding) --------------------- */
+.jc { font-family: Consolas, monospace; font-size: 12px; line-height: 1.55; border: 1px solid var(--border); border-radius: 4px; overflow: auto; }
+.jc-row { display: flex; }
+.jc-row:hover { background: var(--branch-hover); }
+.jc-gutter { display: flex; flex: 0 0 auto; -webkit-user-select: none; user-select: none; padding-left: 8px; }
+.jc-tri { width: 12px; flex: 0 0 auto; color: var(--muted); cursor: pointer; }
+.jc-tri:hover { color: var(--accent); }
+.jc-tri-spacer { width: 12px; flex: 0 0 auto; }
+.jc-content { padding: 0 8px 0 4px; white-space: pre-wrap; word-break: break-word; }
+.jc-children { padding-left: 16px; }
+.jc-punct { color: var(--muted); }
+.jc-fold { color: var(--muted); background: var(--bg2); border-radius: 3px; padding: 0 5px; margin: 0 2px; cursor: default; }
 .preview-img { max-width: 100%; background: var(--img-bg); padding: 6px; border-radius: 4px; }
 
 /* ---------------- JSON table preview (sortable / filterable) ------------- */

@@ -10,6 +10,7 @@
 //   "x" / 1 / true  -> a single "Value" column, one row
 
 import { el } from "../core/dom.js";
+import { escapeHtml } from "../core/format.js";
 
 function cellText(v) {
   if (v == null) return "";
@@ -112,4 +113,194 @@ export function jsonTableView(text) {
   } catch { return null; }
   const table = toTable(data);
   return buildTable(table.columns, table.rows);
+}
+
+// ---------------- JSON tree (collapsible, fold/unfold + total counts) ----------------
+
+// Recursively tally every object, array and scalar value in the parsed tree
+// (root included), so the summary reflects the whole document, not just the
+// top level.
+function countTree(value) {
+  let objects = 0, arrays = 0, values = 0;
+  (function walk(v) {
+    if (v !== null && typeof v === "object") {
+      if (Array.isArray(v)) { arrays++; v.forEach(walk); }
+      else { objects++; Object.values(v).forEach(walk); }
+    } else {
+      values++;
+    }
+  })(value);
+  return { objects, arrays, values };
+}
+
+function countLabel({ objects, arrays, values }) {
+  const parts = [];
+  if (objects) parts.push(`${objects} object${objects === 1 ? "" : "s"}`);
+  if (arrays) parts.push(`${arrays} array${arrays === 1 ? "" : "s"}`);
+  parts.push(`${values} value${values === 1 ? "" : "s"}`);
+  return parts.join(" · ");
+}
+
+// JSON tree node with collapse/expand. Branches toggle on click; leaves are
+// colored by type.
+function buildTreeNode(value, keyLabel) {
+  const node = el("div", "jt-node");
+  const isObj = value !== null && typeof value === "object";
+  if (isObj) {
+    const isArr = Array.isArray(value);
+    const entries = isArr ? value.map((v, i) => [i, v]) : Object.entries(value);
+    const row = el("div", "jt-row jt-branch");
+    const tri = el("span", "jt-tri", entries.length ? "▾" : "·");
+    row.appendChild(tri);
+    if (keyLabel != null) row.appendChild(el("span", "jt-key", keyLabel + ":"));
+    row.appendChild(el("span", "jt-meta", isArr ? `Array(${entries.length})` : `{${entries.length}}`));
+    const children = el("div", "jt-children");
+    for (const [k, v] of entries) children.appendChild(buildTreeNode(v, String(k)));
+    node._open = true;
+    node._apply = () => {
+      if (!entries.length) return;
+      children.style.display = node._open ? "" : "none";
+      tri.textContent = node._open ? "▾" : "▸";
+    };
+    row.addEventListener("click", (e) => { e.stopPropagation(); node._open = !node._open; node._apply(); });
+    node.appendChild(row);
+    node.appendChild(children);
+  } else {
+    const row = el("div", "jt-row");
+    row.appendChild(el("span", "jt-tri-spacer"));
+    if (keyLabel != null) row.appendChild(el("span", "jt-key", keyLabel + ":"));
+    const type = value === null ? "null" : typeof value;
+    const cls =
+      type === "number" ? "tok-num" : type === "boolean" ? "tok-bool" : type === "null" ? "tok-null" : "tok-str";
+    const text = value === null ? "null" : type === "string" ? JSON.stringify(value) : String(value);
+    row.appendChild(el("span", cls, text));
+    node.appendChild(row);
+  }
+  return node;
+}
+
+function setTreeOpen(root, open) {
+  root.querySelectorAll(".jt-node").forEach((n) => { if (n._apply) { n._open = open; n._apply(); } });
+}
+
+// Parse `text` as JSON and return a collapsible tree view — Expand all /
+// Collapse all controls plus a total object/array/value count above a
+// click-to-fold tree — or null if `text` isn't valid JSON at all.
+export function jsonTreeView(text) {
+  let data;
+  try {
+    const t = String(text).trim();
+    if (!t) return null;
+    data = JSON.parse(t);
+  } catch { return null; }
+
+  const wrap = el("div", "jtree-wrap");
+  const bar = el("div", "preview-bar");
+  const exp = el("button", "linkbtn", "Expand all");
+  const col = el("button", "linkbtn", "Collapse all");
+  const count = el("span", "jt-summary", countLabel(countTree(data)));
+  bar.append(exp, col, count);
+  const tree = el("div", "jt");
+  tree.appendChild(buildTreeNode(data, null));
+  exp.addEventListener("click", () => setTreeOpen(tree, true));
+  col.addEventListener("click", () => setTreeOpen(tree, false));
+  wrap.append(bar, tree);
+  return wrap;
+}
+
+// ---------------- JSON code view (code-editor-style folding) ----------------
+//
+// Renders real JSON source — braces, brackets, commas, colons — with a fold
+// arrow in the gutter on every line that opens a non-empty object/array.
+// Built recursively from the parsed value (not by matching brackets in
+// pretty-printed text): each object/array becomes an open row + a
+// `.jc-children` container + a close row, mirroring buildTreeNode's
+// row/children split. That nesting is what makes fold state survive a
+// parent re-expanding — collapsing a parent only toggles its own children
+// container's display, so a nested region left folded stays folded
+// underneath, exactly like a real code editor.
+
+function jcToken(value) {
+  const type = value === null ? "null" : typeof value;
+  const cls = type === "number" ? "tok-num" : type === "boolean" ? "tok-bool" : type === "null" ? "tok-null" : "tok-str";
+  const text = value === null ? "null" : type === "string" ? JSON.stringify(value) : String(value);
+  return `<span class="${cls}">${escapeHtml(text)}</span>`;
+}
+
+// One gutter+content row. `foldable` gets a clickable ▾ arrow; other rows get
+// a same-width spacer so content columns still line up.
+function jcRow(foldable) {
+  const row = el("div", "jc-row");
+  const gutter = el("div", "jc-gutter");
+  const tri = el("span", foldable ? "jc-tri" : "jc-tri-spacer", foldable ? "▾" : null);
+  gutter.appendChild(tri);
+  const content = el("div", "jc-content");
+  row.append(gutter, content);
+  return { row, content, tri };
+}
+
+// Recursively build rows for `value` (a key/isLast pair positions it within
+// its parent so the key prefix and trailing comma render correctly).
+function buildCodeValue(value, key, isLast) {
+  const keyHtml = key != null ? `<span class="tok-key">${escapeHtml(JSON.stringify(String(key)))}</span><span class="jc-punct">: </span>` : "";
+  const commaHtml = isLast ? "" : `<span class="jc-punct">,</span>`;
+  const isObj = value !== null && typeof value === "object";
+
+  if (!isObj) {
+    const { row, content } = jcRow(false);
+    content.innerHTML = keyHtml + jcToken(value) + commaHtml;
+    return row;
+  }
+
+  const isArr = Array.isArray(value);
+  const entries = isArr ? value.map((v, i) => [null, v]) : Object.entries(value);
+  const openCh = isArr ? "[" : "{";
+  const closeCh = isArr ? "]" : "}";
+
+  if (!entries.length) {
+    const { row, content } = jcRow(false);
+    content.innerHTML = `${keyHtml}<span class="jc-punct">${openCh}${closeCh}</span>${commaHtml}`;
+    return row;
+  }
+
+  const frag = document.createDocumentFragment();
+  const openRow = jcRow(true);
+  const expandedHtml = `${keyHtml}<span class="jc-punct">${openCh}</span>`;
+  openRow.content.innerHTML = expandedHtml;
+  frag.appendChild(openRow.row);
+
+  const children = el("div", "jc-children");
+  entries.forEach(([k, v], idx) => children.appendChild(buildCodeValue(v, k, idx === entries.length - 1)));
+  frag.appendChild(children);
+
+  const closeRow = jcRow(false);
+  closeRow.content.innerHTML = `<span class="jc-punct">${closeCh}</span>${commaHtml}`;
+  frag.appendChild(closeRow.row);
+
+  let open = true;
+  const itemWord = `${entries.length} item${entries.length === 1 ? "" : "s"}`;
+  const collapsedHtml = `${keyHtml}<span class="jc-punct">${openCh}</span><span class="jc-fold" title="${itemWord}">&hellip;</span><span class="jc-punct">${closeCh}</span>${commaHtml}`;
+  openRow.tri.addEventListener("click", () => {
+    open = !open;
+    openRow.tri.textContent = open ? "▾" : "▸";
+    openRow.content.innerHTML = open ? expandedHtml : collapsedHtml;
+    children.style.display = open ? "" : "none";
+    closeRow.row.style.display = open ? "" : "none";
+  });
+
+  return frag;
+}
+
+// Parse `text` as JSON and return a per-line-foldable code view (real JSON
+// punctuation, gutter fold arrows), or null if `text` isn't valid JSON at all.
+export function jsonCodeView(text) {
+  let data;
+  try {
+    const t = String(text).trim();
+    if (!t) return null;
+    data = JSON.parse(t);
+  } catch { return null; }
+  const wrap = el("div", "jc");
+  wrap.appendChild(buildCodeValue(data, null, true));
+  return wrap;
 }

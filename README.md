@@ -1,4 +1,4 @@
-**Version:** 2.19.4 | **Last Modified:** 2026-07-19
+**Version:** 2.19.7 | **Last Modified:** 2026-07-21
 
 ![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)
@@ -7,9 +7,6 @@ Decrypts CipherNet API **request payloads**, **encrypted query strings**, and
 **responses** straight inside Chrome DevTools, so you can read the plaintext
 while debugging.
 
-## How it matches the backend
-
-The backend (`EncryptionMiddleware.cs`) uses:
 
 | Setting   | Value                                              |
 | --------- | -------------------------------------------------- |
@@ -28,7 +25,6 @@ to .NET's default — so round-trips match byte-for-byte.
 1. Open `chrome://extensions`
 2. Toggle **Developer mode** (top-right) on
 3. Click **Load unpacked** and select this folder
-   (`c:\Joy\Project\AkijErpDecryption`)
 4. Open **DevTools** (F12) on your app → switch to the **"CipherNet"** tab
 5. Trigger an API call. Each request appears with a decrypted
    **Request Payload**, **Query String**, and **Response**.
@@ -64,7 +60,8 @@ to .NET's default — so round-trips match byte-for-byte.
     and decrypted **Request Payload**, each with a **View raw / View decrypted**
     toggle and **Copy**.
   - **Preview** — pretty, collapsible **JSON tree** of the (decrypted) response
-    with **Expand all / Collapse all**; images are rendered inline.
+    with **Expand all / Collapse all** and a summary line totalling every
+    object, array and value in the document; images are rendered inline.
   - **Response** — the decrypted response body, pretty-printed JSON.
   - **Timing** — DNS / Connect / SSL / Send / Waiting (TTFB) / Download
     breakdown with proportional bars.
@@ -180,12 +177,29 @@ to .NET's default — so round-trips match byte-for-byte.
   toggle, a **Preview** table, and a **Copy** button, and tries a few encodings
   (trimmed, unquoted, percent-decoded); each Encrypt output line has a **Copy**
   button.
+  - **View raw / View decrypted, foldable** — whichever of the two is showing,
+    when that text is JSON it renders as a **per-line-foldable code view** (real
+    `{ }` / `[ ]` / `,` / `:` punctuation with a click-to-fold ▾ arrow in the
+    gutter next to every object/array line) instead of flat text.
+    Collapsing a line merges it into `{ … },` and hides its lines — including
+    its own closing-bracket line — while a still-folded nested region stays
+    folded when its parent is re-expanded. Non-JSON text falls back to plain
+    text. Available everywhere **View raw / View decrypted** appears
+    (Encrypt/Decrypt tool, API Testing response, and the request detail Payload/
+    Response tabs).
   - **Preview** — when the decrypted body is tabular JSON (an array of objects,
     an object, or an array), a **Preview** button beside the raw/decrypted toggle
     shows it as a **table** with **click-to-sort** headers and a **per-column
     filter** box. The **View raw / decrypted** toggle stays visible in Preview,
     so one click jumps back to the text. Available anywhere a decrypted body is
     shown (Encrypt/Decrypt tool, API Testing response, and the request detail tabs).
+  - **Tree** — a **Tree** button next to Preview shows the decrypted JSON as a
+    collapsible tree: click any object/array row to fold/unfold it, **Expand
+    all / Collapse all** to do it for the whole document, and a summary line
+    (`N objects · M arrays · K values`) totals every object, array and scalar
+    in the document, not just the top level. Available everywhere Preview is
+    (Encrypt/Decrypt tool, API Testing response, and the request detail Payload/
+    Response tabs); the request detail **Preview** tab shows this tree view directly.
   - **Paste a whole URL** — if the input is a URL with a query string
     (`https://host/path?<query>`), each button transforms just the query and
     shows the **full URL** (with Copy): **Decrypt** decodes an encrypted query,
