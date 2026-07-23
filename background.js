@@ -16,6 +16,7 @@
 //    panel messages this worker — a top-level, same-origin context — to do it.
 
 import { idbGet, idbDelete, HANDLE_KEY } from "./src/services/handleStore.js";
+import { logError } from "./src/core/errorLog.js";
 
 const watchers = new Map(); // tabId -> Set<Port>
 
@@ -84,33 +85,43 @@ chrome.webRequest.onErrorOccurred.addListener((d) => {
 // the panel, not an error.
 async function backupStatus() {
   let handle = null;
-  try { handle = await idbGet(HANDLE_KEY); } catch { /* IDB unavailable */ }
+  try { handle = await idbGet(HANDLE_KEY); } catch (err) { logError("background.backupStatus.idb", err); }
   if (!handle) return { linked: false, name: "", ready: false };
   let perm = "prompt";
-  try { perm = await handle.queryPermission({ mode: "readwrite" }); } catch { /* handle stale */ }
+  try { perm = await handle.queryPermission({ mode: "readwrite" }); } catch (err) { logError("background.backupStatus.perm", err); }
   return { linked: true, name: handle.name || "", ready: perm === "granted" };
 }
 
 async function backupRead() {
-  const handle = await idbGet(HANDLE_KEY);
-  if (!handle) return { ok: false, reason: "not-linked" };
-  if ((await handle.queryPermission({ mode: "readwrite" })) !== "granted") {
-    return { ok: false, reason: "not-authorized" };
+  try {
+    const handle = await idbGet(HANDLE_KEY);
+    if (!handle) return { ok: false, reason: "not-linked" };
+    if ((await handle.queryPermission({ mode: "readwrite" })) !== "granted") {
+      return { ok: false, reason: "not-authorized" };
+    }
+    const file = await handle.getFile();
+    return { ok: true, text: await file.text(), name: handle.name };
+  } catch (err) {
+    logError("background.backupRead", err);
+    return { ok: false, reason: err.message || "read failed" };
   }
-  const file = await handle.getFile();
-  return { ok: true, text: await file.text(), name: handle.name };
 }
 
 async function backupWrite(text) {
-  const handle = await idbGet(HANDLE_KEY);
-  if (!handle) return { ok: false, reason: "not-linked" };
-  if ((await handle.queryPermission({ mode: "readwrite" })) !== "granted") {
-    return { ok: false, reason: "not-authorized" };
+  try {
+    const handle = await idbGet(HANDLE_KEY);
+    if (!handle) return { ok: false, reason: "not-linked" };
+    if ((await handle.queryPermission({ mode: "readwrite" })) !== "granted") {
+      return { ok: false, reason: "not-authorized" };
+    }
+    const w = await handle.createWritable();
+    await w.write(text);
+    await w.close();
+    return { ok: true, name: handle.name };
+  } catch (err) {
+    logError("background.backupWrite", err);
+    return { ok: false, reason: err.message || "write failed" };
   }
-  const w = await handle.createWritable();
-  await w.write(text);
-  await w.close();
-  return { ok: true, name: handle.name };
 }
 
 // The panel can't open a tab itself (DevTools pages get a reduced API surface),

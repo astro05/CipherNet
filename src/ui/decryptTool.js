@@ -11,6 +11,7 @@
 import { state } from "../core/state.js";
 import { els } from "../core/els.js";
 import { el, copyBtn } from "../core/dom.js";
+import { logError } from "../core/errorLog.js";
 import { CipherNetCrypto } from "../core/crypto.js";
 import { safeDecode, stripQuotes } from "../core/format.js";
 import { bodyView } from "./detail.js";
@@ -97,6 +98,7 @@ async function runEncryptValue() {
     els.decOutput.hidden = false;
     flashDec("Encrypted ✓");
   } catch (e) {
+    logError("decryptTool.encryptValue", e);
     flashDec(e.message || "Encryption failed.", true);
   }
 }

@@ -4,6 +4,7 @@
 import { state, DEFAULT_KV_KEY_WIDTH } from "../core/state.js";
 import { els } from "../core/els.js";
 import { el, copyBtn } from "../core/dom.js";
+import { logError } from "../core/errorLog.js";
 import { CipherNetCrypto } from "../core/crypto.js";
 import { formatBody, prettyText, escapeHtml, safeDecode, fmtTime } from "../core/format.js";
 import { fetchContent } from "../services/capture.js";
@@ -347,6 +348,10 @@ export function bodyView(decrypted, raw, res) {
     const text = showingRaw || decrypted == null ? raw || "" : decrypted;
     navigator.clipboard.writeText(prettyText(text)).then(() => {
       copy.textContent = "Copied!";
+      setTimeout(() => (copy.textContent = "Copy"), 1200);
+    }).catch((err) => {
+      logError("detail.copy", err);
+      copy.textContent = "Copy failed";
       setTimeout(() => (copy.textContent = "Copy"), 1200);
     });
   });

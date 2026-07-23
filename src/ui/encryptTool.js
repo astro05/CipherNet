@@ -7,6 +7,7 @@
 import { state } from "../core/state.js";
 import { els } from "../core/els.js";
 import { el } from "../core/dom.js";
+import { logError } from "../core/errorLog.js";
 import { CipherNetCrypto } from "../core/crypto.js";
 import { safeDecode, fmtTime, fmtSize, stripQuotes, statusPhrase, statusTitle, escapeHtml } from "../core/format.js";
 import {
@@ -574,37 +575,42 @@ function saveHistoryEntry(histEntry) {
 // that second step is what brings saved requests back after the extension has
 // been removed and re-added, with no interaction beyond re-linking the file once.
 async function loadStores() {
-  const { collections: c, legacy } = await getCollections();
-  collections = c || {};
-  // Migrate pre-2.9 flat saves, and pre-2.14 local-only saves, into synced
-  // folder-based collections the first time.
-  if (!c && legacy && Object.keys(legacy).length) {
-    collections = { Default: legacy };
-    setCollections(collections);
-  }
-  history = (await loadHistory()).reverse(); // storage keeps oldest-first; show newest first
+  try {
+    const { collections: c, legacy } = await getCollections();
+    collections = c || {};
+    // Migrate pre-2.9 flat saves, and pre-2.14 local-only saves, into synced
+    // folder-based collections the first time.
+    if (!c && legacy && Object.keys(legacy).length) {
+      collections = { Default: legacy };
+      setCollections(collections);
+    }
+    history = (await loadHistory()).reverse(); // storage keeps oldest-first; show newest first
 
-  const envRes = await getEnvironments();
-  environments = envRes.environments;
-  activeEnv = environments[envRes.activeEnv] ? envRes.activeEnv : "";
-  updateEnvLabel();
-
-  savedResponses = await loadSavedResponses();
-
-  // Fold the linked backup file in on top of the local stores — this is what
-  // brings collections, history, environments AND saved responses back after a
-  // remove/re-add, with no interaction beyond re-linking the file once.
-  const res = await backup.pullOnLoad(collections, history, environments, savedResponses);
-  if (res.pulled) {
-    collections = res.collections;
-    history = res.history;
-    environments = res.environments;
-    if (activeEnv && !environments[activeEnv]) activeEnv = "";
-    savedResponses = res.savedResponses;
+    const envRes = await getEnvironments();
+    environments = envRes.environments;
+    activeEnv = environments[envRes.activeEnv] ? envRes.activeEnv : "";
     updateEnvLabel();
+
+    savedResponses = await loadSavedResponses();
+
+    // Fold the linked backup file in on top of the local stores — this is what
+    // brings collections, history, environments AND saved responses back after a
+    // remove/re-add, with no interaction beyond re-linking the file once.
+    const res = await backup.pullOnLoad(collections, history, environments, savedResponses);
+    if (res.pulled) {
+      collections = res.collections;
+      history = res.history;
+      environments = res.environments;
+      if (activeEnv && !environments[activeEnv]) activeEnv = "";
+      savedResponses = res.savedResponses;
+      updateEnvLabel();
+    }
+    renderOpenPanels();
+    refreshBackupState();
+  } catch (err) {
+    logError("encryptTool.loadStores", err);
+    flashEnc("Could not load saved collections/history — see console for details.", true);
   }
-  renderOpenPanels();
-  refreshBackupState();
 }
 function renderOpenPanels() {
   if (!els.historyPanel.hidden) renderHistoryPanel();
@@ -875,6 +881,7 @@ els.backupFile.addEventListener("change", async () => {
     checkDirty();
     flashEnc(`Restored ${res.requests} request(s) in ${res.folders} folder(s), ${res.history.length} history, ${Object.keys(res.environments).length} env(s), ${res.savedResponses.length} saved response(s) ✓`);
   } catch (err) {
+    logError("encryptTool.backupRestore", err);
     flashEnc(`Restore failed: ${err.message || err}`, true);
   }
 });
@@ -1157,6 +1164,7 @@ async function sendRequest(mode) {
       if (willSendBody) body = await CipherNetCrypto.encrypt(rawBody, state.key, state.iv);
     }
   } catch (e) {
+    logError("encryptTool.requestEncryption", e);
     flashEnc(e.message || "Encryption failed.", true);
     return;
   }
@@ -1206,6 +1214,7 @@ async function sendRequest(mode) {
     const missing = unresolvedVars([rawUrl, rawBody, token, ...Object.keys(headers), ...Object.values(headers)]);
     flashEnc(missing.length ? `Sent — unresolved ${missing.join(" ")} (no ${activeEnv ? "such var" : "environment"})` : "");
   } catch (e) {
+    logError("encryptTool.sendRequest", e);
     flashEnc("Request failed: " + (e.message || e), true);
   }
 }
@@ -1310,7 +1319,10 @@ function respCopyControl(entry) {
       if (!text) { flashEnc(`Nothing to copy for ${label}.`, true); return; }
       navigator.clipboard.writeText(text)
         .then(() => flashEnc(`Copied ${label} ✓`))
-        .catch(() => flashEnc("Copy failed.", true));
+        .catch((err) => {
+          logError(`encryptTool.copy.${label}`, err);
+          flashEnc("Copy failed.", true);
+        });
     });
     menu.appendChild(item);
   }

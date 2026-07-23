@@ -6,6 +6,7 @@ import "./ui/theme.js"; // first, to set the theme before the panel paints
 
 import { state, DEFAULT_KEY, DEFAULT_IV, DEFAULT_LIST_WIDTH, DEFAULT_KV_KEY_WIDTH } from "./core/state.js";
 import { els } from "./core/els.js";
+import { logError } from "./core/errorLog.js";
 import { loadSettings } from "./services/storage.js";
 import {
   renderTypePills, syncMoreFilterChecks, updateMoreFiltersBtn, applyFilter, refreshPageHost,
@@ -81,4 +82,6 @@ renderHead();
 renderTypePills();
 refreshPageHost();
 updateCount();
-loadSettings().then(applySettings);
+loadSettings().then(applySettings).catch((err) => {
+  logError("main.loadSettings", err);
+});

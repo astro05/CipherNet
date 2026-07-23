@@ -13,6 +13,8 @@
 // per-key cap, and entries are capped at 100 with oldest-first eviction to
 // stay under the total budget.
 
+import { logError } from "../core/errorLog.js";
+
 const KEYS = [
   "key", "iv", "columns", "layout", "sort",
   "preserveLog", "disableCache", "throttle", "typeFilters", "moreFilters",
@@ -25,7 +27,10 @@ export function loadSettings() {
 
 // Persist a partial settings object. Optional callback mirrors chrome.storage.
 export function saveSettings(partial, cb) {
-  chrome.storage.local.set(partial, cb);
+  chrome.storage.local.set(partial, () => {
+    if (chrome.runtime.lastError) logError("storage.saveSettings", chrome.runtime.lastError);
+    cb && cb();
+  });
 }
 
 /* ------------------------------ collections ------------------------------ */
@@ -51,7 +56,9 @@ export function getCollections() {
 // than silently drop the save, since Collections are a deliberate save.
 export function setCollections(map, cb) {
   chrome.storage.sync.set({ savedCollections: map }, () => {
-    cb && cb(chrome.runtime.lastError ? chrome.runtime.lastError.message : null);
+    const err = chrome.runtime.lastError;
+    if (err) logError("storage.setCollections", err);
+    cb && cb(err ? err.message : null);
   });
 }
 
@@ -69,13 +76,18 @@ export function getEnvironments() {
 }
 export function setEnvironments(environments, activeEnv, cb) {
   chrome.storage.sync.set({ environments, activeEnv }, () => {
-    cb && cb(chrome.runtime.lastError ? chrome.runtime.lastError.message : null);
+    const err = chrome.runtime.lastError;
+    if (err) logError("storage.setEnvironments", err);
+    cb && cb(err ? err.message : null);
   });
 }
 // Write only the variable map (used by a backup pull/restore) without disturbing
 // which environment this device has active.
 export function setEnvironmentsMap(environments) {
-  return new Promise((resolve) => chrome.storage.sync.set({ environments }, resolve));
+  return new Promise((resolve) => chrome.storage.sync.set({ environments }, () => {
+    if (chrome.runtime.lastError) logError("storage.setEnvironmentsMap", chrome.runtime.lastError);
+    resolve();
+  }));
 }
 
 /* -------------------------- saved responses ---------------------------- */
@@ -104,11 +116,18 @@ export async function addSavedResponse(entry) {
   while (next.length > SAVED_RESP_MAX_ITEMS) { next.pop(); evicted++; }
   while (next.length > 1 && JSON.stringify(next).length > SAVED_RESP_MAX_BYTES) { next.pop(); evicted++; }
   if (JSON.stringify(next).length > SAVED_RESP_MAX_BYTES) return { ok: false, list, evicted };
-  await new Promise((resolve) => chrome.storage.local.set({ [SAVED_RESP_KEY]: next }, resolve));
-  return { ok: true, list: next, evicted };
+  const ok = await new Promise((resolve) => chrome.storage.local.set({ [SAVED_RESP_KEY]: next }, () => {
+    const err = chrome.runtime.lastError;
+    if (err) logError("storage.addSavedResponse", err);
+    resolve(!err);
+  }));
+  return ok ? { ok: true, list: next, evicted } : { ok: false, list, evicted };
 }
 export async function updateSavedResponses(list) {
-  await new Promise((resolve) => chrome.storage.local.set({ [SAVED_RESP_KEY]: list }, resolve));
+  await new Promise((resolve) => chrome.storage.local.set({ [SAVED_RESP_KEY]: list }, () => {
+    if (chrome.runtime.lastError) logError("storage.updateSavedResponses", chrome.runtime.lastError);
+    resolve();
+  }));
   return list;
 }
 
@@ -191,7 +210,11 @@ export async function addHistoryEntry(entry) {
   order.push(key);
   const nextIdx = { next: idx.next + 1, order };
   const ok = await new Promise((resolve) =>
-    chrome.storage.sync.set({ [key]: trimmed, [HIST_INDEX_KEY]: nextIdx }, () => resolve(!chrome.runtime.lastError))
+    chrome.storage.sync.set({ [key]: trimmed, [HIST_INDEX_KEY]: nextIdx }, () => {
+      const err = chrome.runtime.lastError;
+      if (err) logError("storage.addHistoryEntry", err);
+      resolve(!err);
+    })
   );
   return ok ? { ok: true, key } : { ok: false, key: null };
 }
@@ -234,7 +257,11 @@ export async function setHistoryBulk(entries) {
   const order = kept.map((e) => e._key).reverse(); // storage keeps oldest-first
   writes[HIST_INDEX_KEY] = { next: kept.length, order };
   const ok = await new Promise((resolve) =>
-    chrome.storage.sync.set(writes, () => resolve(!chrome.runtime.lastError))
+    chrome.storage.sync.set(writes, () => {
+      const err = chrome.runtime.lastError;
+      if (err) logError("storage.setHistoryBulk", err);
+      resolve(!err);
+    })
   );
   return ok ? kept.reverse() : [];
 }

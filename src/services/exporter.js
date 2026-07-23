@@ -4,6 +4,7 @@
 import { state } from "../core/state.js";
 import { els } from "../core/els.js";
 import { typeOf, nameOf } from "../core/format.js";
+import { logError, getLogText } from "../core/errorLog.js";
 import { gatherDecrypted } from "./capture.js";
 
 // Export whatever is currently shown (after filter/search); if nothing is
@@ -88,9 +89,15 @@ async function exportDecrypted() {
     }
     const session = { tool: "CipherNet", version: "1.0.0", exportedAt: new Date().toISOString(), entries: out };
     download(tsName("decrypted.json"), JSON.stringify(session, null, 2), "application/json");
-  } finally {
     flashExport("");
+  } catch (err) {
+    logError("exporter.exportDecrypted", err);
+    flashExport("export failed");
+    setTimeout(() => flashExport(""), 1500);
   }
+}
+async function exportErrorLog() {
+  download(tsName("errorlog.txt"), await getLogText(), "text/plain");
 }
 
 /* ------------------------------- wiring ------------------------------- */
@@ -102,8 +109,9 @@ els.exportMenu.addEventListener("click", (e) => e.stopPropagation());
 els.exportMenu.querySelectorAll("button").forEach((b) => {
   b.addEventListener("click", () => {
     els.exportMenu.hidden = true;
-    if (!state.entries.length) { flashExport("nothing to export"); setTimeout(() => flashExport(""), 1200); return; }
     const fmt = b.dataset.fmt;
+    if (fmt === "errorlog") { exportErrorLog(); return; } // independent of captured requests
+    if (!state.entries.length) { flashExport("nothing to export"); setTimeout(() => flashExport(""), 1200); return; }
     if (fmt === "har") exportHar();
     else if (fmt === "json") exportJson();
     else if (fmt === "csv") exportCsv();

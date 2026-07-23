@@ -1,5 +1,7 @@
 // core/dom.js — tiny DOM/util primitives shared across the UI.
 
+import { logError } from "./errorLog.js";
+
 // Create an element with an optional class and text content.
 export function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -15,6 +17,10 @@ export function copyBtn(getText) {
     e.stopPropagation();
     navigator.clipboard.writeText(getText()).then(() => {
       b.textContent = "Copied!";
+      setTimeout(() => (b.textContent = "Copy"), 1200);
+    }).catch((err) => {
+      logError("dom.copyBtn", err);
+      b.textContent = "Copy failed";
       setTimeout(() => (b.textContent = "Copy"), 1200);
     });
   });

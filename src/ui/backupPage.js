@@ -10,6 +10,7 @@
 import { idbGet, idbSet, HANDLE_KEY } from "../services/handleStore.js";
 import { serialize, restoreFromText } from "../services/backup.js";
 import { getCollections, loadHistory } from "../services/storage.js";
+import { logError } from "../core/errorLog.js";
 
 const els = {
   linked: document.getElementById("linked"),
@@ -56,7 +57,10 @@ async function currentText() {
 }
 
 async function showLinked() {
-  const handle = await idbGet(HANDLE_KEY).catch(() => null);
+  const handle = await idbGet(HANDLE_KEY).catch((err) => {
+    logError("backupPage.idbGet", err);
+    return null;
+  });
   const mode = new URLSearchParams(location.search).get("mode");
 
   if (!handle) {
@@ -64,7 +68,10 @@ async function showLinked() {
     els.cardGrant.hidden = true;
     return;
   }
-  const perm = await handle.queryPermission({ mode: "readwrite" }).catch(() => "prompt");
+  const perm = await handle.queryPermission({ mode: "readwrite" }).catch((err) => {
+    logError("backupPage.queryPermission", err);
+    return "prompt";
+  });
   els.linked.textContent = perm === "granted"
     ? `Linked to “${handle.name}” — auto-save is on.`
     : `Linked to “${handle.name}” — access needs re-authorising.`;
@@ -77,7 +84,10 @@ els.openBtn.addEventListener("click", async () => {
   try {
     [handle] = await window.showOpenFilePicker({ types: FILE_TYPES, multiple: false });
   } catch (e) {
-    if (e.name !== "AbortError") say(e.message || "Could not open the file picker.", "err");
+    if (e.name !== "AbortError") {
+      logError("backupPage.filePicker", e);
+      say(e.message || "Could not open the file picker.", "err");
+    }
     return;
   }
   try {
@@ -100,6 +110,7 @@ els.openBtn.addEventListener("click", async () => {
       "ok"
     );
   } catch (e) {
+    logError("backupPage.restoreFromOpen", e);
     say(e.message || "Restore failed.", "err");
   }
 });
@@ -110,7 +121,10 @@ els.createBtn.addEventListener("click", async () => {
   try {
     handle = await window.showSaveFilePicker({ suggestedName: "ciphernet-backup.json", types: FILE_TYPES });
   } catch (e) {
-    if (e.name !== "AbortError") say(e.message || "Could not open the file picker.", "err");
+    if (e.name !== "AbortError") {
+      logError("backupPage.filePicker", e);
+      say(e.message || "Could not open the file picker.", "err");
+    }
     return;
   }
   try {
@@ -134,13 +148,17 @@ els.createBtn.addEventListener("click", async () => {
       "ok"
     );
   } catch (e) {
+    logError("backupPage.createBackupFile", e);
     say(e.message || "Could not write the backup file.", "err");
   }
 });
 
 /* ---- Re-authorise a file Chrome has since revoked access to ---- */
 els.grantBtn.addEventListener("click", async () => {
-  const handle = await idbGet(HANDLE_KEY).catch(() => null);
+  const handle = await idbGet(HANDLE_KEY).catch((err) => {
+    logError("backupPage.idbGet", err);
+    return null;
+  });
   if (!handle) { say("No backup file is linked.", "err"); return; }
   try {
     if ((await handle.requestPermission({ mode: "readwrite" })) !== "granted") {
@@ -151,6 +169,7 @@ els.grantBtn.addEventListener("click", async () => {
     await showLinked();
     say("Auto-save is on again. You can close this tab.", "ok");
   } catch (e) {
+    logError("backupPage.reauthorise", e);
     say(e.message || "Could not re-authorise the file.", "err");
   }
 });

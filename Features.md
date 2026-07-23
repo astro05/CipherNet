@@ -1,4 +1,4 @@
-**Version:** 2.19.7 | **Last Modified:** 2026-07-21
+**Version:** 2.19.9 | **Last Modified:** 2026-07-22
 
 # Features
 
@@ -175,6 +175,7 @@ Postman-style request builder: a `[method ▾] [ URL ] [Send ▾]` request line 
 ## Export
 - **CSV export** — download requests as comma-separated values
 - **Decrypted session export** — `.json` with raw + decrypted query, request body, response for each request
+- **Error log export** — download internal errors as a `.txt` file (no console output, no external telemetry — errors are logged locally and pulled on demand)
 - **HAR export** — download requests in HAR format
 - **JSON export** — download requests as JSON
 - **Per-request copy** — Copy button on each decrypted output (Headers, Payload, Response, etc.)
