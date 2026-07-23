@@ -1,4 +1,4 @@
-**Version:** 2.19.9 | **Last Modified:** 2026-07-22
+**Version:** 2.19.11 | **Last Modified:** 2026-07-23
 
 # Features
 
@@ -30,8 +30,9 @@
 - **🌎 Environment switcher** — pick an active environment in the API Testing toolbar (turns green when one is active); "No Environment" disables substitution
 - **{{name}} substitution** — reference variables as `{{name}}` anywhere in the URL, headers, body, or Bearer token; they're resolved at **send time** (the editors keep the `{{name}}` literal, so it's non-destructive and reusable)
 - **Manage in place** — create / rename / delete environments and edit their `name → value` variables in one pop-panel
-- **Colour-highlighted in the URL** — `{{name}}` renders in a distinct colour right in the URL field: blue when the active environment defines it, red when it doesn't
-- **Autocomplete** — type `{{` in the URL and a dropdown of the active environment's variables (name + value) appears; ↑/↓ to move, Enter/Tab or click to insert, Esc to dismiss
+- **Colour-highlighted everywhere** — `{{name}}` renders in a distinct colour right inside the URL, Bearer Token, Body, or any Params/Headers Key/Value cell: blue when the active environment defines it, red when it doesn't
+- **Autocomplete everywhere** — type `{{` in the URL, Bearer Token, Body, or any Params/Headers Key/Value cell and a dropdown of the active environment's variables (name + value) appears; ↑/↓ to move, Enter/Tab or click to insert, Esc to dismiss
+- **Params stay literal in the URL** — a `{{name}}` typed into a Param's Key or Value isn't percent-encoded when it syncs into the URL bar, so it stays readable and resolves correctly
 - **Unresolved heads-up** — after a send, any `{{name}}` not defined in the active environment is called out in the status line
 - **Persisted + backed up** — environments live in `chrome.storage.sync` and are also written to the linked backup file, so they survive a remove/re-add
 

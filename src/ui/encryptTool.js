@@ -295,28 +295,40 @@ function refreshUrlHighlight() {
   els.encUrlHl.scrollLeft = els.encUrl.scrollLeft;
 }
 
-// Autocomplete: while the caret sits just after an unclosed {{prefix, offer the
-// active environment's matching variable names.
+// Autocomplete: while the caret in any {{var}}-aware field sits just after an
+// unclosed {{prefix, offer the active environment's matching variable names.
+// One shared dropdown (#varSuggest) is repositioned under whichever field
+// triggered it (attachVarSuggest), so every field gets this for free.
+let suggestField = null;
 let suggestItems = [];
 let suggestIndex = 0;
 let suggestCtx = null;
-function varPrefixAtCaret() {
-  const caret = els.encUrl.selectionStart;
+function varPrefixAtCaret(field) {
+  const caret = field.selectionStart;
   if (caret == null) return null;
-  const before = els.encUrl.value.slice(0, caret);
+  const before = field.value.slice(0, caret);
   const m = before.match(/\{\{\s*([\w.$-]*)$/);
   return m ? { prefix: m[1], start: caret - m[0].length, caret } : null;
 }
-function showVarSuggest() {
-  const ctx = varPrefixAtCaret();
+function positionVarSuggest(field) {
+  const r = field.getBoundingClientRect();
+  const width = Math.max(220, r.width);
+  els.varSuggest.style.left = Math.max(4, Math.min(r.left, window.innerWidth - width - 8)) + "px";
+  els.varSuggest.style.top = (r.bottom + 2) + "px";
+  els.varSuggest.style.minWidth = width + "px";
+}
+function showVarSuggest(field) {
+  const ctx = varPrefixAtCaret(field);
   const names = (activeEnv && environments[activeEnv]) ? Object.keys(environments[activeEnv]) : [];
   if (!ctx || !names.length) return hideVarSuggest();
   const matches = names.filter((n) => n.toLowerCase().startsWith(ctx.prefix.toLowerCase())).sort();
   if (!matches.length) return hideVarSuggest();
+  suggestField = field;
   suggestItems = matches;
   suggestIndex = 0;
   suggestCtx = ctx;
   renderVarSuggest();
+  positionVarSuggest(field);
   els.varSuggest.hidden = false;
 }
 function renderVarSuggest() {
@@ -325,36 +337,83 @@ function renderVarSuggest() {
   suggestItems.forEach((name, i) => {
     const it = el("div", "var-suggest-item" + (i === suggestIndex ? " active" : ""));
     it.append(el("span", "vs-name", `{{${name}}}`), el("span", "vs-val", String(vars[name] ?? "")));
-    // mousedown (not click) so the input doesn't blur before we insert.
+    // mousedown (not click) so the field doesn't blur before we insert.
     it.addEventListener("mousedown", (e) => { e.preventDefault(); insertVar(name); });
     els.varSuggest.appendChild(it);
   });
 }
-function hideVarSuggest() { els.varSuggest.hidden = true; suggestItems = []; suggestCtx = null; }
+function hideVarSuggest() { els.varSuggest.hidden = true; suggestItems = []; suggestCtx = null; suggestField = null; }
 function insertVar(name) {
-  const ctx = suggestCtx || varPrefixAtCaret();
-  if (!ctx) return hideVarSuggest();
+  const field = suggestField, ctx = suggestCtx;
+  if (!field || !ctx) return hideVarSuggest();
   const insert = `{{${name}}}`;
-  els.encUrl.value = els.encUrl.value.slice(0, ctx.start) + insert + els.encUrl.value.slice(ctx.caret);
+  field.value = field.value.slice(0, ctx.start) + insert + field.value.slice(ctx.caret);
   const pos = ctx.start + insert.length;
-  els.encUrl.setSelectionRange(pos, pos);
+  field.setSelectionRange(pos, pos);
   hideVarSuggest();
-  renderParamsFromUrl(); // URL changed → rebuild the params table + highlight
-  refreshUrlHighlight();
-  checkDirty();
-  els.encUrl.focus();
+  // Re-run that field's own "input" wiring (URL highlight/params sync, dirty
+  // check, headers/params table sync…) instead of duplicating it here.
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+  field.focus();
 }
-els.encUrl.addEventListener("input", () => { refreshUrlHighlight(); showVarSuggest(); });
-els.encUrl.addEventListener("scroll", () => { els.encUrlHl.scrollLeft = els.encUrl.scrollLeft; });
-els.encUrl.addEventListener("click", showVarSuggest);
-els.encUrl.addEventListener("blur", () => setTimeout(hideVarSuggest, 120));
-els.encUrl.addEventListener("keydown", (e) => {
+function varSuggestKeydown(e) {
   if (els.varSuggest.hidden || !suggestItems.length) return;
   if (e.key === "ArrowDown") { e.preventDefault(); suggestIndex = (suggestIndex + 1) % suggestItems.length; renderVarSuggest(); }
   else if (e.key === "ArrowUp") { e.preventDefault(); suggestIndex = (suggestIndex - 1 + suggestItems.length) % suggestItems.length; renderVarSuggest(); }
   else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertVar(suggestItems[suggestIndex]); }
   else if (e.key === "Escape") { e.preventDefault(); hideVarSuggest(); }
-});
+}
+// Wire {{var}} autocomplete onto a field. Used for the URL, Bearer Token, Body,
+// and every Params/Headers Key/Value cell (attached as each row is built).
+function attachVarSuggest(field) {
+  field.addEventListener("input", () => showVarSuggest(field));
+  field.addEventListener("click", () => showVarSuggest(field));
+  field.addEventListener("blur", () => setTimeout(hideVarSuggest, 120));
+  field.addEventListener("keydown", varSuggestKeydown);
+}
+attachVarSuggest(els.encUrl);
+attachVarSuggest(els.encToken);
+attachVarSuggest(els.encBody);
+els.encUrl.addEventListener("input", refreshUrlHighlight); // URL keeps its own dedicated backdrop (below)
+els.encUrl.addEventListener("scroll", () => { els.encUrlHl.scrollLeft = els.encUrl.scrollLeft; });
+
+// Generic {{var}} colour-highlight overlay for every other {{var}}-aware field
+// (Bearer Token, Body, Params/Headers Key/Value cells): same blue(known)/
+// red(unknown) colouring as the URL field, via the same highlightVarsHtml().
+// A backdrop <div> is copied the field's font/padding/border metrics so its
+// text lines up exactly, then the field's own text is made transparent so
+// only its caret shows — same trick as the URL field, generalised so it works
+// on any input/textarea without per-field CSS.
+const OVERLAY_METRICS = [
+  "fontFamily", "fontSize", "fontWeight", "lineHeight", "letterSpacing",
+  "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
+  "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
+];
+function addVarHighlight(field, multiline) {
+  const hl = el("div", "var-ov-hl");
+  hl.setAttribute("aria-hidden", "true");
+  hl.style.whiteSpace = multiline ? "pre-wrap" : "pre";
+  const wrap = el("div", "var-ov");
+  field.replaceWith(wrap); // field must already have a parent for this to work
+  wrap.append(hl, field);
+  field.classList.add("var-ov-field");
+  const refresh = () => {
+    hl.innerHTML = highlightVarsHtml(field.value);
+    hl.scrollTop = field.scrollTop;
+    hl.scrollLeft = field.scrollLeft;
+  };
+  field.addEventListener("input", refresh);
+  field.addEventListener("scroll", refresh);
+  // Deferred so dynamically-created rows (appended to the DOM right after
+  // this call returns) are connected by the time we read computed style.
+  queueMicrotask(() => {
+    const cs = getComputedStyle(field);
+    for (const p of OVERLAY_METRICS) hl.style[p] = cs[p];
+    refresh();
+  });
+}
+addVarHighlight(els.encToken, true);
+addVarHighlight(els.encBody, true);
 
 // The full request state a collection entry / history load round-trips through.
 function snapshot() {
@@ -948,6 +1007,18 @@ function parseQueryPairs(query) {
   }
   return pairs;
 }
+// encodeURIComponent, but leaves {{name}} variable references untouched so a
+// var used as a param key/value stays readable and resolvable in the URL bar
+// instead of getting mangled into %7B%7Bname%7D%7D.
+function encodeQueryPart(str) {
+  const re = /\{\{\s*[\w.$-]+\s*\}\}/g;
+  let out = "", last = 0, m;
+  while ((m = re.exec(str))) {
+    out += encodeURIComponent(str.slice(last, m.index)) + m[0];
+    last = m.index + m[0].length;
+  }
+  return out + encodeURIComponent(str.slice(last));
+}
 // One editable row: [enable] Key | Value | Description | [remove]. Shared by the
 // Query Params and Request Headers tables (they differ only in what an edit does).
 function makeKvRow(key, value, desc, enabled, onRemove) {
@@ -971,7 +1042,15 @@ function makeKvRow(key, value, desc, enabled, onRemove) {
   rm.title = "Remove";
   rm.addEventListener("click", () => onRemove(row));
   actWrap.appendChild(rm);
-  row.append(enWrap, mk("ep-key", "Key", key), mk("ep-value", "Value", value), mk("ep-desc", "Description", desc), actWrap);
+  const keyInp = mk("ep-key", "Key", key);
+  const valueInp = mk("ep-value", "Value", value);
+  row.append(enWrap, keyInp, valueInp, mk("ep-desc", "Description", desc), actWrap);
+  // addVarHighlight wraps the field in place, so it must run after the field
+  // has a parent (i.e. after row.append above).
+  for (const inp of [keyInp, valueInp]) {
+    attachVarSuggest(inp);
+    addVarHighlight(inp, false);
+  }
   return row;
 }
 function makeParamRow(key = "", value = "", enabled = true) {
@@ -1011,7 +1090,7 @@ function syncUrlFromParams() {
       value: r.querySelector(".ep-value").value,
     }))
     .filter((p) => p.on && p.key !== "")
-    .map((p) => encodeURIComponent(p.key) + "=" + encodeURIComponent(p.value))
+    .map((p) => encodeQueryPart(p.key) + "=" + encodeQueryPart(p.value))
     .join("&");
   const { base } = urlBaseQuery(els.encUrl.value);
   els.encUrl.value = base + (query ? "?" + query : "");

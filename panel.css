@@ -338,11 +338,10 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .var-token.unknown { color: var(--err); }
 :root[data-theme="light"] .var-token { color: #1a73e8; }
 
-/* {{var}} autocomplete dropdown, anchored under the URL field */
+/* {{var}} autocomplete dropdown — one shared instance, JS-positioned (fixed)
+   under whichever field (URL, Bearer Token, Body, Params/Headers cell) has focus. */
 .var-suggest {
-  position: absolute;
-  top: calc(100% + 2px);
-  left: 0;
+  position: fixed;
   min-width: 220px;
   max-width: 360px;
   max-height: 200px;
@@ -367,6 +366,31 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .var-suggest-item.active, .var-suggest-item:hover { background: var(--hover); }
 .vs-name { color: var(--tok-key); flex: 0 0 auto; }
 .vs-val { color: var(--muted); flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Generic {{var}} colour-highlight overlay for every field besides the URL
+   (Bearer Token, Body, Params/Headers Key/Value cells): same blue(known)/
+   red(unknown) colouring via .var-token, wired up by addVarHighlight() in
+   encryptTool.js. A backdrop <div> is given the field's own font/padding/
+   border metrics (copied in JS) so its text lines up exactly; the field's own
+   text is made transparent so only its caret shows on top of it. */
+.var-ov { position: relative; display: block; width: 100%; }
+.var-ov-hl {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--fg);
+  border-style: solid;
+  border-color: transparent;
+}
+.var-ov-field {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+  color: transparent !important;
+  caret-color: var(--fg);
+}
+.var-ov-field::placeholder { color: var(--muted) !important; }
 
 /* Send Encrypted (green) + Send Plain (purple) — solid fills, white text. */
 #toolbar .req-send {
@@ -566,7 +590,11 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
   min-width: 0;
   font-family: Consolas, monospace;
 }
-.ep-key:focus, .ep-value:focus, .ep-desc:focus { outline: none; background: var(--bg); }
+.ep-desc:focus { outline: none; background: var(--bg); }
+/* Key/Value carry a {{var}} highlight overlay (see .var-ov below), so their
+   focus state is a ring rather than an opaque fill — a fill would hide the
+   coloured backdrop text underneath while typing. */
+.ep-key:focus, .ep-value:focus { outline: none; box-shadow: inset 0 0 0 1px var(--accent); }
 .ep-remove {
   background: transparent;
   border: none;

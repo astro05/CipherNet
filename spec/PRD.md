@@ -34,5 +34,6 @@ Full requirements are split one file per spec section under `spec/`. Read [00-ov
 | 27 | Network Controls | [27-network-controls.md](27-network-controls.md) |
 | 28 | Backup & Restore (Collections + History) | [28-backup-restore.md](28-backup-restore.md) |
 |  | Important Constraints | [29-important-constraints.md](29-important-constraints.md) |
+| 30 | Request Builder Variables ({{name}}) | [30-request-builder-variables.md](30-request-builder-variables.md) |
 
 When a section's scope or requirements change, edit that section's file directly — this index only tracks the table of contents.

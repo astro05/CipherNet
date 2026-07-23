@@ -1,4 +1,4 @@
-**Version:** 2.19.9 | **Last Modified:** 2026-07-22
+**Version:** 2.19.11 | **Last Modified:** 2026-07-23
 
 ![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)
@@ -112,10 +112,13 @@ to .NET's default — so round-trips match byte-for-byte.
   - **🌎 Environments (`{{variables}}`)** — pick an active environment from the
     toolbar; then `{{name}}` in the URL, headers, body, or token is substituted from
     that environment **at send time** (the editors keep the `{{name}}` literal, so
-    it's reusable). In the URL, `{{name}}` is **colour-highlighted** (blue when the
-    active environment defines it, red when it doesn't), and typing `{{` opens an
-    **autocomplete** of that environment's variables (↑/↓, Enter/Tab or click to
-    insert). Create / rename / delete environments and edit their `name → value`
+    it's reusable). `{{name}}` is **colour-highlighted** everywhere it can be typed —
+    URL, Bearer Token, Body, and Params/Headers Key/Value cells (blue when the
+    active environment defines it, red when it doesn't) — and typing `{{` in any of
+    those fields opens an **autocomplete** of that environment's variables (↑/↓,
+    Enter/Tab or click to insert). A `{{name}}` typed into a Param's Key or Value
+    is kept literal (not percent-encoded) when it syncs into the URL bar. Create /
+    rename / delete environments and edit their `name → value`
     variables right in the pop-panel. Persisted in `chrome.storage.sync` **and**
     the backup file; a heads-up in the status line flags any `{{name}}` the active
     environment doesn't define.
