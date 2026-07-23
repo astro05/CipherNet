@@ -13,13 +13,13 @@
 //                      afterwards so the extension ID stays stable. Keep it
 //                      secret — anyone with it can publish updates that
 //                      Chrome treats as the same extension.
-//   - CipherNet.crx   the packaged extension (drag onto chrome://extensions).
-//   - CipherNet.zip   plain zip of dist/ — this is what the Chrome Web Store
-//                      wants if you ever publish there.
+//   - CipherNet-<version>.crx   the packaged extension (drag onto chrome://extensions).
+//   - CipherNet-<version>.zip   plain zip of dist/ — this is what the Chrome
+//                                Web Store wants if you ever publish there.
 //
 // Run with:  npm run pack
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import crx3 from "crx3";
@@ -28,14 +28,15 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const DIST = join(ROOT, "dist");
 const MANIFEST = join(DIST, "manifest.json");
 
-const keyPath = join(ROOT, "..", "ciphernet-key", "key.pem");
-const crxPath = join(ROOT, "CipherNet.crx");
-const zipPath = join(ROOT, "CipherNet.zip");
-
 if (!existsSync(MANIFEST)) {
   console.error(`dist/ not built (missing ${MANIFEST}).\nRun:  npm run build`);
   process.exit(1);
 }
+
+const { version } = JSON.parse(readFileSync(MANIFEST, "utf8"));
+const keyPath = join(ROOT, "..", "ciphernet-key", "key.pem");
+const crxPath = join(ROOT, `CipherNet-${version}.crx`);
+const zipPath = join(ROOT, `CipherNet-${version}.zip`);
 
 const hadKey = existsSync(keyPath);
 
@@ -47,4 +48,4 @@ console.log(`  extension id : ${info.appId}`);
 console.log(`  crx          : ${crxPath}`);
 console.log(`  zip          : ${zipPath}`);
 console.log(`  key          : ${keyPath}  ${hadKey ? "(reused)" : "(newly generated — keep it safe!)"}`);
-console.log(`\nInstall: open chrome://extensions, enable Developer mode, drag CipherNet.crx onto the page.`);
+console.log(`\nInstall: open chrome://extensions, enable Developer mode, drag CipherNet-${version}.crx onto the page.`);
