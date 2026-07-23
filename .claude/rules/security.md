@@ -8,7 +8,7 @@ paths:
 
 # Crypto & Key Handling Rules
 
-Per PRD §24 (Security):
+Per `spec/24-security.md`:
 
 - Keys and IVs must never be logged — no `console.log`/`console.error` of key material, and no telemetry of any kind (offline-first, no external calls).
 - Mask sensitive values (keys, tokens, decrypted secrets) in any UI element that isn't the deliberate key-entry/reveal box.
