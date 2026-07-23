@@ -8,7 +8,7 @@
 //   - Everything else the browser loads (manifest, HTML, CSS, icons) is copied
 //     verbatim — those can't be "encrypted" or Chrome won't load them.
 //   - The directory structure is preserved (dist/src/... mirrors src/...).
-//   - Dev-only files (selftest.mjs, build/, docs/, node_modules/, package.json)
+//   - Dev-only files (selftest.mjs, build/, spec/, node_modules/, package.json)
 //     are intentionally NOT copied into dist/.
 //
 // Run with:  npm run build

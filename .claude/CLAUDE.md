@@ -1,6 +1,6 @@
 # CipherNet
 
-Always read `docs/PRD.md` before implementing any feature.
+Always read `spec/PRD.md` before implementing any feature.
 
 
 When implementing:

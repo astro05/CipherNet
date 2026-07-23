@@ -18,4 +18,4 @@
 
 ## Docs
 - [ ] `Features.md` reflects any new/changed features in this release
-- [ ] `docs/PRD.md` updated if scope or requirements changed
+- [ ] `spec/PRD.md` updated if scope or requirements changed

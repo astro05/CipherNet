@@ -288,7 +288,7 @@ to .NET's default — so round-trips match byte-for-byte.
   `prefers-color-scheme` media query) and re-themes live when you flip the
   DevTools theme — no reload needed.
 
-## Not yet implemented (from `docs/PRD.md`)
+## Not yet implemented (from `spec/PRD.md`)
 
 This extension covers capture, a resizable request table (resize/reorder/hide/
 persist columns), decryption, the detail tabs above, advanced filtering, search,
