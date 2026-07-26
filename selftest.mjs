@@ -67,5 +67,70 @@ for (const sample of samples) {
   console.log(`   decrypted : ${back}`);
 }
 
+// --- Key file round-trip (src/core/keyFile.js: PBKDF2 + AES-GCM) ---
+// Re-implemented against Node's webcrypto rather than imported, since
+// keyFile.js uses browser globals (`crypto.subtle`, `atob`/`btoa`) that
+// don't exist under plain Node.
+async function keyFileRoundTrip() {
+  const APP_PASSPHRASE = "CipherNet.v1.key-file"; // must match src/core/keyFile.js
+  const b64 = (bytes) => Buffer.from(bytes).toString("base64");
+  const fromB64 = (s) => new Uint8Array(Buffer.from(s, "base64"));
+  const teEnc = new TextEncoder();
+  const teDec = new TextDecoder();
+
+  async function deriveKey(salt) {
+    const material = await webcrypto.subtle.importKey("raw", teEnc.encode(APP_PASSPHRASE), "PBKDF2", false, ["deriveKey"]);
+    return webcrypto.subtle.deriveKey(
+      { name: "PBKDF2", salt, iterations: 600_000, hash: "SHA-256" },
+      material,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  }
+  async function encryptKeyFile(key, iv) {
+    const salt = webcrypto.getRandomValues(new Uint8Array(16));
+    const gcmIv = webcrypto.getRandomValues(new Uint8Array(12));
+    const aesKey = await deriveKey(salt);
+    const ctBuf = await webcrypto.subtle.encrypt({ name: "AES-GCM", iv: gcmIv }, aesKey, teEnc.encode(JSON.stringify({ key, iv })));
+    return JSON.stringify({ v: 1, salt: b64(salt), iv: b64(gcmIv), ct: b64(new Uint8Array(ctBuf)) });
+  }
+  async function decryptKeyFile(fileText) {
+    const parsed = JSON.parse(fileText);
+    const aesKey = await deriveKey(fromB64(parsed.salt));
+    const plainBuf = await webcrypto.subtle.decrypt({ name: "AES-GCM", iv: fromB64(parsed.iv) }, aesKey, fromB64(parsed.ct));
+    return JSON.parse(teDec.decode(plainBuf));
+  }
+
+  const fileText = await encryptKeyFile(KEY, IV);
+  let ok = !fileText.includes(KEY) && !fileText.includes(IV); // no plaintext key in the file
+  console.log(`\n${ok ? "✓" : "✗"} key file has no plaintext key/IV`);
+
+  const back = await decryptKeyFile(fileText);
+  const roundTripOk = back.key === KEY && back.iv === IV;
+  ok = ok && roundTripOk;
+  console.log(`${roundTripOk ? "✓" : "✗"} key file round-trip`);
+
+  // AES-GCM authenticates the ciphertext, so a flipped bit must be rejected
+  // rather than silently decrypting to garbage — the one integrity guarantee
+  // this scheme still has now that the passphrase is fixed, not secret.
+  let tamperRejected = false;
+  const parsed = JSON.parse(fileText);
+  const ctBytes = fromB64(parsed.ct);
+  ctBytes[0] ^= 0xff;
+  const tampered = JSON.stringify({ ...parsed, ct: b64(ctBytes) });
+  try {
+    await decryptKeyFile(tampered);
+  } catch {
+    tamperRejected = true;
+  }
+  ok = ok && tamperRejected;
+  console.log(`${tamperRejected ? "✓" : "✗"} key file rejects a tampered ciphertext`);
+
+  return ok;
+}
+
+if (!(await keyFileRoundTrip())) failures++;
+
 console.log(`\n${failures === 0 ? "✅ ALL PASSED" : `❌ ${failures} FAILED`}`);
 process.exit(failures === 0 ? 0 : 1);

@@ -114,10 +114,13 @@
         <div id="typeFilters" class="type-filters"></div>
       </div>
       <div class="tb-row keys" id="keysRow">
-        <label>Key <input id="keyInput" type="text" spellcheck="false" placeholder="enter AES key" /></label>
-        <label>IV <input id="ivInput" type="text" spellcheck="false" placeholder="optional — defaults to key" /></label>
+        <label>Key <input id="keyInput" type="password" autocomplete="off" spellcheck="false" placeholder="enter AES key" /></label>
+        <label>IV <input id="ivInput" type="password" autocomplete="off" spellcheck="false" placeholder="optional — defaults to key" /></label>
         <button id="saveKey">Save</button>
         <button id="resetKey" class="ghost">Clear</button>
+        <span class="sep"></span>
+        <button id="loadKeyFile" class="ghost" title="Load key/IV from an encrypted key file">📂 Load Key File</button>
+        <input id="keyFileInput" type="file" accept=".key,.json" hidden />
         <span id="keyStatus" class="muted"></span>
       </div>
       <div class="tb-row encryptor" id="encryptRow">

@@ -1,4 +1,4 @@
-**Version:** 2.19.11 | **Last Modified:** 2026-07-23
+**Version:** 2.19.15 | **Last Modified:** 2026-07-26
 
 # Features
 
@@ -120,8 +120,9 @@ Postman-style request builder: a `[method ▾] [ URL ] [Send ▾]` request line 
 - **IV (optional)** — set custom IV or use key as IV
 - **Key auto-save** — persists via `chrome.storage`
 - **Key blink indicator** — red blink when no key is saved
-- **Key entry box** — textbox to paste and save AES key
+- **Key entry box** — masked (password) fields to paste and save AES key/IV, never shown in plaintext
 - **Key persistence** — stored key persists across DevTools sessions
+- **Encrypted key file (load-only)** — Load the key/IV from a `.key` file, encrypted (PBKDF2 + AES-GCM) under a fixed app passphrase — no passphrase prompt, no plaintext key in the file or UI, but not a secrecy boundary against anyone with the extension's source (PRD §31)
 
 ## Network Capture
 - **Auto capture on Inspect** — capturing starts the instant DevTools opens (before the CipherNet tab is even clicked); requests that fire while you're still on Elements/Console/Network are buffered and replayed once the panel loads, so nothing is missed
@@ -157,7 +158,7 @@ Postman-style request builder: a `[method ▾] [ URL ] [Send ▾]` request line 
 ## Toolbar
 - **Encrypt/Decrypt tool** — encrypt or decrypt a pasted value with the saved key
 - **API Testing tool** — compose and send CipherNet requests (Send Encrypted / Send Plain), with Collections & History
-- **Key box** — manage AES key and IV
+- **Key box** — manage AES key and IV (masked entry, plus Load from an encrypted key file)
 - **Network view** — the default request list + detail pane
 - **View switchers** — click to switch between Network, API Testing, and Encrypt/Decrypt (active tool toggles back to Network)
 

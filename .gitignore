@@ -10,6 +10,11 @@ dist/
 key.pem
 *.pem
 
+# Encrypted AES key files loaded via the 🔑 Key box's "Load Key File" — even
+# encrypted, an AES key has no business in version control.
+ciphernet-key*
+*.key
+
 # OS / editor
 .DS_Store
 Thumbs.db

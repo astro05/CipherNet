@@ -6,6 +6,8 @@ import { els } from "../core/els.js";
 import { saveSettings } from "../services/storage.js";
 import { runSearch } from "../services/search.js";
 import { renderDetail } from "./detail.js";
+import { decryptKeyFile } from "../core/keyFile.js";
+import { logError } from "../core/errorLog.js";
 
 function flashKey(msg) {
   els.keyStatus.textContent = msg;
@@ -44,3 +46,28 @@ els.resetKey.addEventListener("click", () => {
   refreshKeyIndicator(); // no key now → resume blinking
 });
 els.keysToggle.addEventListener("click", () => els.keysRow.classList.toggle("open"));
+
+// Load: pick a key file, decrypt it under the app's fixed passphrase (see
+// core/keyFile.js), and use the result exactly like a manually-typed key
+// (persist + invalidate caches). No passphrase prompt — the file alone is
+// enough.
+els.loadKeyFile.addEventListener("click", () => els.keyFileInput.click());
+els.keyFileInput.addEventListener("change", async () => {
+  const file = els.keyFileInput.files && els.keyFileInput.files[0];
+  els.keyFileInput.value = ""; // let the same file be picked again later
+  if (!file) return;
+  try {
+    const { key, iv } = await decryptKeyFile(await file.text());
+    state.key = key;
+    state.iv = iv;
+    els.keyInput.value = key;
+    els.ivInput.value = iv;
+    saveSettings({ key: state.key, iv: state.iv }, () => flashKey("Loaded ✓"));
+    onKeyChanged();
+    els.keysRow.classList.remove("open");
+    refreshKeyIndicator();
+  } catch (e) {
+    logError("keyBox.loadKeyFile", e);
+    flashKey("Load failed — not a valid key file");
+  }
+});

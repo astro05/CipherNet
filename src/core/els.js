@@ -16,6 +16,8 @@ export const els = {
   ivInput: document.getElementById("ivInput"),
   saveKey: document.getElementById("saveKey"),
   resetKey: document.getElementById("resetKey"),
+  loadKeyFile: document.getElementById("loadKeyFile"),
+  keyFileInput: document.getElementById("keyFileInput"),
   keyStatus: document.getElementById("keyStatus"),
   // API Testing tool (Postman-style request builder)
   encryptToggle: document.getElementById("encryptToggle"),

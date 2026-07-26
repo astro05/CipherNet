@@ -1,4 +1,4 @@
-**Version:** 2.19.11 | **Last Modified:** 2026-07-23
+**Version:** 2.19.15 | **Last Modified:** 2026-07-26
 
 ![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)
@@ -76,10 +76,19 @@ to .NET's default — so round-trips match byte-for-byte.
   Encrypted only, Export) show **only in the Network view** and are hidden while a
   tool is open, so the view switchers stay uncluttered.
 - **Key 🔑** — starts empty: enter your AES key and **Save** (the **IV** is
-  optional and defaults to the key). Saving persists it via `chrome.storage`,
+  optional and defaults to the key). Both fields are masked (`type="password"`) —
+  the key is never shown in plaintext. Saving persists it via `chrome.storage`,
   re-renders the open request live, and **auto-closes the Key box**. While no key
   is saved the **🔑 Key** button **blinks red** so it's obvious one is needed.
   **Clear** wipes the stored key (and starts the blink again).
+  **Load Key File** loads the key/IV from a `.key` file (JSON content, `.key`
+  extension) made for this app — no passphrase prompt, just pick the file.
+  It's encrypted (PBKDF2 + AES-GCM) under a fixed passphrase built into the
+  extension, so the key is never sitting in the file as plaintext — but that
+  passphrase isn't secret (it ships in the extension's own source), so this
+  is obfuscation, not a security boundary against anyone who has the
+  extension's code. There's no in-app way to create a `.key` file — see
+  [spec/31-key-file.md](spec/31-key-file.md).
 - **API Testing 🚀** — a Postman-style composer for **sending** CipherNet requests. The
   layout mirrors Postman: a request line — **`[method ▾] [ URL ] [Send ▾]`** — sits
   above a tab bar (**Params · Authorization · Headers · Body**), with a decrypting
