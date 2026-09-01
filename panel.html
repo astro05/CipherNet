@@ -142,8 +142,20 @@
               <div id="varSuggest" class="var-suggest" hidden></div>
             </div>
           </div>
-          <button id="sendEncryptBtn" class="req-send req-send-enc" title="Encrypt the query string and body, then send">Send Encrypted</button>
-          <button id="sendPlainBtn" class="req-send req-send-plain" title="Send the request exactly as entered (no encryption)">Send Plain</button>
+          <div class="menu-wrap send-split">
+            <button id="sendEncryptBtn" class="req-send req-send-enc" title="Encrypt the query string and body, then send">Send Encrypted</button>
+            <button id="sendEncMoreBtn" class="req-send req-send-more req-send-enc-more" type="button" title="More send options">▾</button>
+            <div id="sendEncMenu" class="menu" hidden>
+              <button type="button">⬇ Download response</button>
+            </div>
+          </div>
+          <div class="menu-wrap send-split">
+            <button id="sendPlainBtn" class="req-send req-send-plain" title="Send the request exactly as entered (no encryption)">Send Plain</button>
+            <button id="sendPlainMoreBtn" class="req-send req-send-more req-send-plain-more" type="button" title="More send options">▾</button>
+            <div id="sendPlainMenu" class="menu" hidden>
+              <button type="button">⬇ Download response</button>
+            </div>
+          </div>
         </div>
         <!-- Request tab bar: Params / Authorization / Headers / Body (Postman-style). -->
         <div class="req-tabs" id="reqTabs">

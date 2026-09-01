@@ -1,4 +1,4 @@
-**Version:** 2.19.17 | **Last Modified:** 2026-09-01
+**Version:** 2.19.21 | **Last Modified:** 2026-09-01
 
 ![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)
@@ -138,6 +138,12 @@ to .NET's default — so round-trips match byte-for-byte.
     (size-capped, oldest-first eviction) and in the backup file. Browse them under
     **🗂 Saved**; clicking one re-opens it, re-decrypted with the current key. Only
     the raw body is stored, never the decrypted plaintext (PRD §24).
+  - **⬇ Send → Download response** — **Send Encrypted** and **Send Plain** each
+    carry a **▾** segment; its **⬇ Download response** item sends the same
+    request but streams the response **directly to a
+    file**, leaving the viewer untouched. Text/JSON is decrypted and
+    pretty-printed; a file, image or any other binary response is saved as-is,
+    using the server's `Content-Disposition` filename when it provides one.
   - **⬇ Download** — beside 📌 Save on the response meta line; writes the response
     body to a file (decrypted when it decrypted, raw when it didn't — the raw
     ciphertext of a decrypted response is still under **📋 Copy ▾ → Response**).

@@ -396,7 +396,8 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 #toolbar .req-send {
   flex: 0 0 auto;
   border-radius: 4px;
-  padding: 3px 16px;
+  padding: 3px 10px;
+  white-space: nowrap;
   color: #fff;
   font-weight: 600;
 }
@@ -406,6 +407,22 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
    it near-white and hide the white text) — just brighten it a touch. */
 #toolbar .req-send-enc:hover { background: #16a34a; border-color: #16a34a; filter: brightness(1.12); }
 #toolbar .req-send-plain:hover { background: #7c3aed; border-color: #7c3aed; filter: brightness(1.12); }
+/* ▾ send options: each Send button is a split button — its own ▾ segment welded
+   on in the same fill, square inner corners, hairline divider (Postman-style). */
+.send-split { display: inline-flex; }
+#toolbar .req-send-enc, #toolbar .req-send-plain { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+#toolbar .req-send-more {
+  border-left: 1px solid rgba(255, 255, 255, 0.4);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding: 3px 5px;
+  font-size: 10px;
+}
+#toolbar .req-send-enc-more, #toolbar .req-send-enc-more:hover { background: #16a34a; border-color: #16a34a; }
+#toolbar .req-send-plain-more, #toolbar .req-send-plain-more:hover { background: #7c3aed; border-color: #7c3aed; }
+#toolbar .req-send-more:hover { filter: brightness(1.12); }
+/* keep the dropdown inside the toolbar instead of hanging off the right edge */
+.send-split .menu { left: auto; right: 0; }
 
 /* Request tab bar (Params / Authorization / Headers / Body). */
 .req-tabs { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }

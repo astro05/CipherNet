@@ -32,6 +32,10 @@ export const els = {
   // request line: two Send buttons (Encrypted / Plain), side by side
   sendEncryptBtn: document.getElementById("sendEncryptBtn"),
   sendPlainBtn: document.getElementById("sendPlainBtn"),
+  sendEncMoreBtn: document.getElementById("sendEncMoreBtn"),
+  sendEncMenu: document.getElementById("sendEncMenu"),
+  sendPlainMoreBtn: document.getElementById("sendPlainMoreBtn"),
+  sendPlainMenu: document.getElementById("sendPlainMenu"),
   // request tabs + panels
   reqTabs: document.getElementById("reqTabs"),
   reqPanels: document.getElementById("reqPanels"),

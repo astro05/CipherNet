@@ -35,6 +35,24 @@ els.encryptToggle.addEventListener("click", () => {
 // first) and purple Send Plain (send exactly as entered).
 els.sendEncryptBtn.addEventListener("click", () => sendRequest("encrypt"));
 els.sendPlainBtn.addEventListener("click", () => sendRequest("decrypt"));
+// §32: each Send button carries a ▾ segment whose "⬇ Download response" sends
+// the same way but streams the response straight to a file — the response
+// viewer is left as it was.
+function closeSendMenus() { els.sendEncMenu.hidden = true; els.sendPlainMenu.hidden = true; }
+for (const [moreBtn, menu, mode] of [
+  [els.sendEncMoreBtn, els.sendEncMenu, "encrypt"],
+  [els.sendPlainMoreBtn, els.sendPlainMenu, "decrypt"],
+]) {
+  moreBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const wasOpen = !menu.hidden;
+    closeSendMenus();
+    menu.hidden = wasOpen;
+  });
+  menu.addEventListener("click", (e) => e.stopPropagation());
+  menu.querySelector("button").addEventListener("click", () => { closeSendMenus(); sendRequest(mode, true); });
+}
+document.addEventListener("click", closeSendMenus);
 
 // Typing a body implies a request that carries one: bump GET → POST (only from
 // GET, never overriding an explicit PUT/PATCH/…) so bodies aren't silently dropped.
@@ -1256,15 +1274,17 @@ function splitUrlForEncrypt(url) {
 // mode "encrypt": encrypt the query string + body first, then send.
 // mode "decrypt": send the URL/body exactly as entered (no encryption).
 // The chosen HTTP method, custom Headers and Bearer Token are all applied as-is.
-async function sendRequest(mode) {
+async function sendRequest(mode, toFile) {
   applyOpenBulk(); // fold any open Bulk Edit box back into the tables first
   // Substitute {{env vars}} first (the editors keep the {{name}} literal).
   const rawUrl = resolveVars(els.encUrl.value).trim();
   const rawBody = resolveVars(els.encBody.value);
   const token = resolveVars(els.encToken.value).trim();
   const method = els.encMethod.value;
-  els.encResponse.hidden = true;
-  els.encResponse.innerHTML = "";
+  if (!toFile) { // download mode leaves whatever response is on screen alone
+    els.encResponse.hidden = true;
+    els.encResponse.innerHTML = "";
+  }
 
   if (!rawUrl) { flashEnc("Enter a URL to send.", true); return; }
 
@@ -1305,11 +1325,20 @@ async function sendRequest(mode) {
   const started = performance.now();
   try {
     const resp = await fetch(url, { method, headers, body: willSendBody ? body : undefined });
+    if (toFile) { // §32: straight to disk, nothing rendered
+      const blob = await resp.blob();
+      saveHistoryEntry({
+        method, mode, url: rawUrl, body: rawBody, token,
+        status: resp.status, statusText: resp.statusText,
+        timeMs: Math.round(performance.now() - started), size: blob.size, at: new Date().toISOString(),
+      });
+      await saveResponseFile(resp, blob, url);
+      return;
+    }
     const text = await resp.text();
     // Decrypt the response body up front (auto-lenient on failure) so switching
     // response tabs / history is instant.
-    const candidates = [text, text.trim(), stripQuotes(text), safeDecode(text)];
-    const decRes = text ? await CipherNetCrypto.tryDecryptAuto(candidates, state.key, state.iv) : null;
+    const decRes = await decryptResponseText(text);
     const entry = {
       method, url,
       // What was actually sent (encrypted, when Send Encrypted) — for the Copy menu.
@@ -1420,25 +1449,60 @@ function respActions(entry) {
   return wrap;
 }
 
+// Auto-decrypt a response body (lenient on failure); null for an empty body.
+async function decryptResponseText(text) {
+  if (!text) return null;
+  const candidates = [text, text.trim(), stripQuotes(text), safeDecode(text)];
+  return CipherNetCrypto.tryDecryptAuto(candidates, state.key, state.iv);
+}
+
+// `<last URL path segment>-<timestamp>.<ext>`, sanitised; "response" when the
+// URL has nothing usable.
+function fileNameFor(url, ext) {
+  let base = "response";
+  try {
+    base = new URL(url).pathname.split("/").filter(Boolean).pop() || "response";
+  } catch (e) { /* relative/odd URL — keep the fallback */ }
+  base = base.replace(/\.[^.]*$/, "").replace(/[^\w.-]/g, "_") || "response";
+  const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
+  return `${base}-${stamp}.${ext}`;
+}
+
+// §32 "Send → Download response": text-ish bodies take the same decrypt +
+// pretty-print path as the viewer's ⬇ Download; anything else (a file, an
+// image, any binary blob) is written byte-for-byte, honouring the server's
+// Content-Disposition filename when it sends one.
+async function saveResponseFile(resp, blob, url) {
+  const ct = resp.headers.get("content-type") || "";
+  const cd = resp.headers.get("content-disposition") || "";
+  const named = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd);
+  if (!named && (!ct || /^text\/|json|xml|javascript|urlencoded/i.test(ct))) {
+    const text = await blob.text();
+    await downloadResponse({ url, body: text, decRes: await decryptResponseText(text),
+      headers: [{ name: "content-type", value: ct }] });
+    return;
+  }
+  let name = named ? named[1].trim() : "";
+  try { name = decodeURIComponent(name); } catch (e) { /* malformed %xx — use as-is */ }
+  name = name.replace(/[^\w.-]/g, "_");
+  if (!name) name = fileNameFor(url, (ct.split(";")[0].split("/")[1] || "bin").replace(/^x-/, "").replace(/[^\w.-]/g, "") || "bin");
+  download(name, blob, ct || "application/octet-stream");
+  flashEnc(`Downloaded ${name} ✓`);
+}
+
 // §32 Download Response: saves exactly what the Body tab shows — decrypted when
 // it decrypted, raw otherwise (Copy ▾ → Response still gives the raw text).
 function downloadResponse(entry) {
   const res = entry.decRes;
   const text = res && res.ok ? res.text : entry.body;
   if (!text) { flashEnc("No response body to download.", true); return; }
-  let base = "response";
-  try {
-    base = new URL(entry.url).pathname.split("/").filter(Boolean).pop() || "response";
-  } catch (e) { /* relative/odd URL — keep the fallback */ }
-  base = base.replace(/\.[^.]*$/, "").replace(/[^\w.-]/g, "_") || "response";
   const ct = ((entry.headers || []).find((h) => h.name.toLowerCase() === "content-type") || {}).value || "";
   const isJson = /json/i.test(ct) || /^\s*[[{]/.test(text);
   let out = text;
   // Pretty-print JSON so the saved file is readable; unparseable text (JSON
   // content-type on a non-JSON body, a truncated response) goes out as-is.
   if (isJson) { try { out = JSON.stringify(JSON.parse(text), null, 2); } catch { /* not valid JSON */ } }
-  const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
-  download(`${base}-${stamp}.${isJson ? "json" : "txt"}`, out, isJson ? "application/json" : "text/plain");
+  download(fileNameFor(entry.url, isJson ? "json" : "txt"), out, isJson ? "application/json" : "text/plain");
   flashEnc("Response downloaded ✓");
 }
 

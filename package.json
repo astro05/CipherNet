@@ -1,6 +1,6 @@
 {
   "name": "ciphernet",
-  "version": "2.19.17",
+  "version": "2.19.21",
   "private": true,
   "description": "CipherNet — Chrome DevTools extension. Build scripts obfuscate the shipped JS into dist/.",
   "type": "module",
