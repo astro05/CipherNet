@@ -29,4 +29,5 @@ data must be mirrored **outside** the extension, to a file on disk.
 * Chrome revokes file permissions across browser restarts. The UI must show when
   auto-save needs re-authorising, and it must be a single click to restore.
 * Per §24, **keys and IVs are never written to the backup file.** The file does
-  contain Bearer tokens saved with a request, and the UI must say so.
+  contain Bearer tokens saved with a request — encrypted (see §24), not
+  plaintext — and the UI must say so.

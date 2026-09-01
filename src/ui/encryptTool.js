@@ -9,6 +9,7 @@ import { els } from "../core/els.js";
 import { el } from "../core/dom.js";
 import { logError } from "../core/errorLog.js";
 import { CipherNetCrypto } from "../core/crypto.js";
+import { encryptToken, decryptToken } from "../core/tokenCrypto.js";
 import { safeDecode, fmtTime, fmtSize, stripQuotes, statusPhrase, statusTitle, escapeHtml } from "../core/format.js";
 import {
   getCollections, setCollections, loadHistory, addHistoryEntry, removeHistoryEntry, clearHistory,
@@ -431,14 +432,14 @@ function sameSnapshot(a, b) {
 }
 // Load a saved/blank request into every field, tolerating pre-2.17 entries that
 // only stored { url, body, token } (method/auth/headers are then derived).
-function setReq(r) {
+async function setReq(r) {
   r = r || {};
   els.encUrl.value = r.url || "";
   els.encBody.value = r.body || "";
-  els.encToken.value = r.token || "";
+  els.encToken.value = await safeDecryptToken(r.token || "");
   els.encMethod.value = VALID_METHODS.has(r.method) ? r.method : ((r.body || "").trim() ? "POST" : "GET");
   els.authType.value = r.authType || (r.token ? "bearer" : "none");
-  setHeaders(r.headers || []);
+  setHeaders(await decryptHeaderRows(r.headers || []));
   renderParamsFromUrl();
   syncAuthUi();
   updateReqTabIndicators();
@@ -479,13 +480,13 @@ els.addReqBtn.addEventListener("click", () => {
   els.addName.focus();
 });
 els.addCancelBtn.addEventListener("click", () => { els.addPanel.hidden = true; });
-els.addSaveBtn.addEventListener("click", () => {
+els.addSaveBtn.addEventListener("click", async () => {
   const name = els.addName.value.trim();
   if (!name) { flashEnc("Enter an API name.", true); return; }
   applyOpenBulk(); // fold any open Bulk Edit box back into the tables first
   const folder = els.addNewFolder.value.trim() || els.addFolder.value || "Default";
   if (!collections[folder]) collections[folder] = {};
-  collections[folder][name] = withMeta(snapshot(), collections[folder][name]);
+  collections[folder][name] = await withMeta(snapshot(), collections[folder][name]);
   persistCollections((err) => flashEnc(err ? `Save failed: ${err}` : `Saved “${name}” to “${folder}” ✓`, !!err));
   currentRef = { folder, name };
   currentSnapshot = snapshot();
@@ -494,11 +495,11 @@ els.addSaveBtn.addEventListener("click", () => {
 });
 
 /* ---- 💾 Save: update the currently-loaded request in place ---- */
-els.saveReqBtn.addEventListener("click", () => {
+els.saveReqBtn.addEventListener("click", async () => {
   if (!currentRef) return;
   applyOpenBulk();
   if (!collections[currentRef.folder]) collections[currentRef.folder] = {};
-  collections[currentRef.folder][currentRef.name] = withMeta(snapshot(), collections[currentRef.folder][currentRef.name]);
+  collections[currentRef.folder][currentRef.name] = await withMeta(snapshot(), collections[currentRef.folder][currentRef.name]);
   persistCollections((err) => flashEnc(err ? `Save failed: ${err}` : `Updated “${currentRef.name}” ✓`, !!err));
   currentSnapshot = snapshot();
   checkDirty();
@@ -508,10 +509,43 @@ els.saveReqBtn.addEventListener("click", () => {
 // Lives inside the collection entry alongside the request fields, so it persists
 // in sync AND rides along in the backup file with no extra plumbing.
 // Preserve the favorite flag on a re-save (Add / 💾 Save) so it isn't wiped.
-function withMeta(reqState, prev) {
-  const out = { ...reqState };
+async function withMeta(reqState, prev) {
+  const out = {
+    ...reqState,
+    token: await encryptToken(reqState.token),
+    headers: await encryptHeaderRows(reqState.headers),
+  };
   if (prev && prev.fav != null) out.fav = prev.fav;
   return out;
+}
+
+// A Bearer token can also be typed as a plain "Authorization" row in the
+// Headers tab instead of the dedicated auth field — same secret, same at-rest
+// encryption. Any other header's value is left untouched.
+function isAuthHeaderKey(key) {
+  return typeof key === "string" && key.toLowerCase() === "authorization";
+}
+async function encryptHeaderRows(rows) {
+  return Promise.all((rows || []).map(async (h) => (
+    isAuthHeaderKey(h.key) ? { ...h, value: await encryptToken(h.value) } : h
+  )));
+}
+async function decryptHeaderRows(rows) {
+  return Promise.all((rows || []).map(async (h) => (
+    isAuthHeaderKey(h.key) ? { ...h, value: await safeDecryptToken(h.value) } : h
+  )));
+}
+// decryptToken() throws on a corrupted/tampered enc1: value (rather than
+// handing back the ciphertext as if it were the real token — that would let a
+// re-save silently entomb the garbage). At the UI boundary there's nothing
+// useful to do with that beyond logging it and leaving the field blank.
+async function safeDecryptToken(stored) {
+  try {
+    return await decryptToken(stored);
+  } catch (e) {
+    logError("encryptTool.decryptToken", e);
+    return "";
+  }
 }
 function toggleFav(folder, name) {
   const r = collections[folder] && collections[folder][name];
@@ -619,14 +653,14 @@ let savedResponses = [];
 
 // Persist one sent request (request + response summary, no response body —
 // see services/storage.js) and mirror it into the in-memory list.
-function saveHistoryEntry(histEntry) {
-  addHistoryEntry(histEntry).then(({ ok, key }) => {
-    if (!ok) return;
-    history.unshift({ ...histEntry, _key: key });
-    if (history.length > 100) history.length = 100;
-    scheduleBackup();
-    if (!els.historyPanel.hidden) renderHistoryPanel();
-  });
+async function saveHistoryEntry(histEntry) {
+  const entry = { ...histEntry, token: await encryptToken(histEntry.token) };
+  const { ok, key } = await addHistoryEntry(entry);
+  if (!ok) return;
+  history.unshift({ ...entry, _key: key });
+  if (history.length > 100) history.length = 100;
+  scheduleBackup();
+  if (!els.historyPanel.hidden) renderHistoryPanel();
 }
 
 /* -------------------------- load collections + history -------------------------- */
@@ -743,9 +777,9 @@ function renderHistoryPanel() {
       renderHistoryPanel();
     });
     row.appendChild(del);
-    row.addEventListener("click", () => {
+    row.addEventListener("click", async () => {
       // History is a lightweight log (no saved headers), so load what it has.
-      setReq({ url: h.url, method: h.method, body: h.body, token: h.token });
+      await setReq({ url: h.url, method: h.method, body: h.body, token: h.token });
       currentRef = null; // loading history doesn't attach it to a saved collection entry
       currentSnapshot = null;
       checkDirty();
@@ -765,6 +799,20 @@ els.savedBtn.addEventListener("click", () => {
   els.savedPanel.hidden = false;
 });
 
+// A saved response's reqHeaders round-trips through chrome.storage.local + the
+// backup file, same as Collections/History — so the Authorization value (any
+// Bearer token sent with the request) gets the same at-rest encryption.
+async function encryptAuthHeader(headers) {
+  const out = { ...(headers || {}) };
+  for (const k of Object.keys(out)) if (k.toLowerCase() === "authorization") out[k] = await encryptToken(out[k]);
+  return out;
+}
+async function decryptAuthHeader(headers) {
+  const out = { ...(headers || {}) };
+  for (const k of Object.keys(out)) if (k.toLowerCase() === "authorization") out[k] = await safeDecryptToken(out[k]);
+  return out;
+}
+
 // Persist the currently-shown response (full body + the request that made it) to
 // chrome.storage.local. The DECRYPTED text is deliberately not stored — only the
 // raw body — so it's re-decrypted with the current key on view (PRD §24).
@@ -779,7 +827,7 @@ async function saveCurrentResponse(entry) {
     method: entry.method,
     url: entry.url,
     reqBody: entry.reqBody || "",
-    reqHeaders: entry.reqHeaders || {},
+    reqHeaders: await encryptAuthHeader(entry.reqHeaders),
     status: entry.status,
     statusText: entry.statusText,
     timeMs: entry.timeMs,
@@ -800,7 +848,8 @@ async function saveCurrentResponse(entry) {
 async function viewSavedResponse(saved) {
   const candidates = [saved.body, saved.body.trim(), stripQuotes(saved.body), safeDecode(saved.body)];
   const decRes = saved.body ? await CipherNetCrypto.tryDecryptAuto(candidates, state.key, state.iv) : null;
-  const entry = { ...saved, decRes, at: new Date(saved.at), _savedId: saved.id };
+  const reqHeaders = await decryptAuthHeader(saved.reqHeaders);
+  const entry = { ...saved, reqHeaders, decRes, at: new Date(saved.at), _savedId: saved.id };
   respTab = "body";
   renderResponseView(entry);
   closePanels();
@@ -967,10 +1016,10 @@ function renameApi(folder, name) {
   persistCollections((err) => flashEnc(err ? `Rename failed: ${err}` : `Renamed to “${next}”`, !!err));
   renderCollectionTree();
 }
-function loadApi(folder, name) {
+async function loadApi(folder, name) {
   const r = collections[folder] && collections[folder][name];
   if (!r) return;
-  setReq(r);
+  await setReq(r);
   currentRef = { folder, name };
   currentSnapshot = snapshot();
   checkDirty();

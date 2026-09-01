@@ -66,8 +66,9 @@
     </div>
 
     <p class="warn">
-      The backup file is plain JSON on your disk and includes any bearer tokens saved with a
-      request. Keep it somewhere private. AES keys and IVs are never written to it.
+      The backup file is plain JSON on your disk. Bearer tokens saved with a request are
+      encrypted in it (not plaintext) — but that's obfuscation, not a secrecy boundary, so
+      still keep it somewhere private. AES keys and IVs are never written to it at all.
     </p>
 
     <div id="status" class="muted"></div>

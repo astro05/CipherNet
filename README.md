@@ -1,4 +1,4 @@
-**Version:** 2.19.15 | **Last Modified:** 2026-07-26
+**Version:** 2.19.16 | **Last Modified:** 2026-07-27
 
 ![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)
@@ -107,9 +107,11 @@ to .NET's default — so round-trips match byte-for-byte.
   - **Params tab** — a Postman-style **Query Params** table (enable checkbox · Key ·
     Value · Description, with add/remove rows), two-way bound to the URL: editing the
     table rewrites the URL and editing the URL rebuilds the table.
-  - **Authorization tab** — **No Auth** or **Bearer Token**. The token is **never
-    encrypted**; it's sent as-is as the `Authorization` header (with `Bearer `
-    prepended if you omit it).
+  - **Authorization tab** — **No Auth** or **Bearer Token**. It's sent as-is as
+    the `Authorization` header (with `Bearer ` prepended if you omit it) —
+    plaintext on the wire is inherent to HTTP Bearer auth, but wherever it's
+    **saved** (Collections, History, `chrome.storage`, the backup file) it's
+    kept encrypted at rest.
   - **Headers tab** — a key/value/description table of custom request headers merged
     into the outgoing request (a count shows on the tab). `Content-Type:
     application/json` is added automatically when a body is sent unless you set your own.
@@ -167,11 +169,15 @@ to .NET's default — so round-trips match byte-for-byte.
       take a one-off snapshot (e.g. to move your setup to another machine). Older
       v1 backups (Collections + History only) still restore fine.
     - The file holds saved requests, history, environment variables and full
-      saved-response bodies — **including any Bearer tokens** (saved with a request
-      or in an environment). **AES keys and IVs are never written to it**, and the
-      🗄 Backup menu says exactly what the file contains. Chrome drops file
-      permissions when the browser restarts; the 🗄 Backup button turns red when
-      auto-save needs re-authorising, which is one click.
+      saved-response bodies. **Bearer tokens saved with a request** are stored
+      **encrypted** (AES-GCM, fixed passphrase — obfuscation, not a secrecy
+      boundary, same threat model as the **Load Key File** feature above)
+      rather than plaintext; a token stored as an **environment variable** instead isn't
+      covered by this, since environment variables are a generic mechanism.
+      **AES keys and IVs are never written to it** at all, and the 🗄 Backup
+      menu says exactly what the file contains. Chrome drops file permissions
+      when the browser restarts; the 🗄 Backup button turns red when auto-save
+      needs re-authorising, which is one click.
   - **Response viewer** — a Postman-style panel: a status · time · size · method
     URL line, then tabs:
     - **Body** — the response body via `bodyView` (decrypted when possible, with

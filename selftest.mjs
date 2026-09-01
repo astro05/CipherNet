@@ -8,6 +8,7 @@
 
 import { createCipheriv } from "node:crypto";
 import { webcrypto } from "node:crypto";
+import { encryptToken, decryptToken } from "./src/core/tokenCrypto.js";
 
 // A neutral 16-char test key (no real secret in source). The point of this test
 // is to prove the AES-128-CBC + PKCS7 round-trip between the .NET-style encrypt
@@ -131,6 +132,44 @@ async function keyFileRoundTrip() {
 }
 
 if (!(await keyFileRoundTrip())) failures++;
+
+// --- Bearer-token-at-rest round-trip (src/core/tokenCrypto.js) ---
+async function tokenCryptoRoundTrip() {
+  const token = "eyJhbGciOiJIUzI1NiJ9.super-secret-bearer-token";
+  const stored = await encryptToken(token);
+  let ok = stored !== token && !stored.includes(token);
+  console.log(`\n${ok ? "✓" : "✗"} stored token is not plaintext`);
+
+  const back = await decryptToken(stored);
+  const roundTripOk = back === token;
+  ok = ok && roundTripOk;
+  console.log(`${roundTripOk ? "✓" : "✗"} token round-trip`);
+
+  // Pre-upgrade entries stored the token as plaintext — decryptToken must hand
+  // those back unchanged rather than mangling or throwing on them.
+  const passthroughOk = (await decryptToken("already-plaintext-token")) === "already-plaintext-token";
+  ok = ok && passthroughOk;
+  console.log(`${passthroughOk ? "✓" : "✗"} plaintext (pre-upgrade) token passes through unchanged`);
+
+  const emptyOk = (await encryptToken("")) === "" && (await decryptToken("")) === "";
+  ok = ok && emptyOk;
+  console.log(`${emptyOk ? "✓" : "✗"} empty token stays empty`);
+
+  // A tampered/truncated ciphertext must throw, not be handed back as if it
+  // were the real token (that would let a re-save silently entomb the garbage).
+  let tamperRejected = false;
+  try {
+    await decryptToken(stored.slice(0, -4) + "AAAA");
+  } catch {
+    tamperRejected = true;
+  }
+  ok = ok && tamperRejected;
+  console.log(`${tamperRejected ? "✓" : "✗"} tampered token ciphertext throws instead of passing through`);
+
+  return ok;
+}
+
+if (!(await tokenCryptoRoundTrip())) failures++;
 
 console.log(`\n${failures === 0 ? "✅ ALL PASSED" : `❌ ${failures} FAILED`}`);
 process.exit(failures === 0 ? 0 : 1);

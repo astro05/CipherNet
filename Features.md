@@ -1,4 +1,4 @@
-**Version:** 2.19.15 | **Last Modified:** 2026-07-26
+**Version:** 2.19.16 | **Last Modified:** 2026-07-27
 
 # Features
 
@@ -22,7 +22,7 @@
 - **Rename folder** — rename a folder (with ✎ button)
 - **Rename request** — rename a saved API request (with ✎ button)
 - **Save button** — update a previously saved request after modifying it (its favorite is preserved)
-- **Save request** — persist requests and Bearer tokens via `chrome.storage.sync` (see **Backup & Restore** for surviving removal of the extension)
+- **Save request** — persist requests and Bearer tokens (encrypted at rest) via `chrome.storage.sync` (see **Backup & Restore** for surviving removal of the extension)
 - **Favorite ★** — star a request; favorites float to the top of their folder (rides along in sync and in the backup file automatically)
 - **Filter box** — a search box at the top of the Collection tree filters folders and requests by name as you type
 
@@ -41,6 +41,7 @@
 - **🗂 Saved panel** — browse saved responses (method · status · name · size); click to re-open, ✎ rename, 🗑 delete
 - **Re-decrypted on view** — only the raw body is stored (never the decrypted plaintext); it's decrypted again with the current key when you open it (PRD §24)
 - **Kept on disk + backed up** — stored in `chrome.storage.local` (far bigger than the sync history quota), capped by count and ~4 MB total with oldest-first eviction, and mirrored into the linked backup file
+- **Bearer token encrypted at rest** — if the request had an `Authorization` header, it's stored as AES-GCM ciphertext and decrypted only when the saved response is opened
 - **Complements History** — Request History logs every send as a lightweight summary; Saved Responses is the deliberate, full-body keep
 
 ## Request History
@@ -49,6 +50,7 @@
 - **Load from history** — click an entry to reload its URL/payload/Bearer token back into the composer
 - **Per-entry delete + Clear all** — remove one entry (🗑) or clear the whole log
 - **Compact by design** — stores the request (URL/body/token) and a response summary (status/size/time), not the full response body, to stay well inside chrome.storage.sync's 100 KB/8 KB-per-item quota across 100 entries
+- **Bearer token encrypted at rest** — the saved token is AES-GCM ciphertext in storage and in the backup file, decrypted only when loaded back into the composer
 
 ## Backup & Restore (Collections, History, Environments & Saved Responses)
 - **Why it exists** — Chrome erases an extension's storage, `local` **and** `sync` alike, when the extension is removed. (Synced settings only come back for Web Store installs on a signed-in profile; a sideloaded build gets nothing back.) A file on disk is the only copy that survives.
@@ -61,7 +63,7 @@
 - **Download a copy** — one-off snapshot, e.g. to move your setup to another machine
 - **Non-destructive merges** — a restore unions folders/requests/environments rather than replacing them; history is de-duplicated by timestamp and saved responses by id
 - **v1 files still load** — older backups (Collections + History only) restore fine; the new fields default empty
-- **Keys are never backed up** — AES keys and IVs stay in `chrome.storage` and are never written to the file (PRD §24). The file *does* contain Bearer tokens (saved with a request, and in environment variables) and full response bodies, so it's kept wherever the user chose to put it — the 🗄 Backup menu says so.
+- **Keys are never backed up** — AES keys and IVs stay in `chrome.storage` and are never written to the file (PRD §24). The file *does* contain Bearer tokens saved with a request (and full response bodies) — the token itself is encrypted at rest (obfuscation via a fixed passphrase, not a secrecy boundary — see PRD §24), so it's not sitting there as plaintext, but the file should still be kept private. A token stored as an **environment variable** value instead of via the Bearer Token field isn't covered by this — environment variables are generic and stay plaintext.
 
 ## Decryption
 - **Auto-lenient mode** — when strict decryption fails, automatically retry by trimming to whole 16-byte blocks without PKCS7 validation
@@ -97,7 +99,7 @@ Postman-style request builder: a `[method ▾] [ URL ] [Send ▾]` request line 
 - **{{env vars}}** — `{{name}}` in the URL / headers / body / token resolves from the active environment at send time (see **Environments**)
 - **Method auto-bump** — typing a body while the method is GET bumps it to POST so bodies aren't silently dropped (GET/HEAD never carry a body)
 - **Params tab** — Postman-style query editor (enable checkbox · Key · Value · Description), two-way bound to the URL
-- **Authorization tab** — No Auth / Bearer Token; the token is sent as `Authorization` as-is (prepended with `Bearer ` if omitted), never encrypted
+- **Authorization tab** — No Auth / Bearer Token; sent as an `Authorization` header as-is (prepended with `Bearer ` if omitted) — sending it in plaintext is inherent to HTTP Bearer auth, but it's encrypted at rest wherever it's saved (Collections, History, `chrome.storage`, the backup file)
 - **Headers tab** — key/value/description editor for custom request headers, merged into the outgoing request (a header count shows on the tab)
 - **Body tab** — full-width raw (JSON) editor; `Content-Type: application/json` is added when a body is sent unless you set your own
 - **Tab indicators** — a green dot marks Params/Authorization/Body when they hold content, matching Postman
