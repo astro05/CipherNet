@@ -1,4 +1,4 @@
-**Version:** 2.19.16 | **Last Modified:** 2026-07-27
+**Version:** 2.19.17 | **Last Modified:** 2026-09-01
 
 ![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)
@@ -138,6 +138,11 @@ to .NET's default — so round-trips match byte-for-byte.
     (size-capped, oldest-first eviction) and in the backup file. Browse them under
     **🗂 Saved**; clicking one re-opens it, re-decrypted with the current key. Only
     the raw body is stored, never the decrypted plaintext (PRD §24).
+  - **⬇ Download** — beside 📌 Save on the response meta line; writes the response
+    body to a file (decrypted when it decrypted, raw when it didn't — the raw
+    ciphertext of a decrypted response is still under **📋 Copy ▾ → Response**).
+    Named `<last URL path segment>-<timestamp>.json|.txt`, with JSON bodies
+    pretty-printed (2-space indent) in the file; works for a saved response too.
   - **Collections (folders of saved requests)** — while the API Testing view is
     open, tools appear in the toolbar after **🔐 Encrypt/Decrypt**:
     - **➕ Add** — opens a small panel to name the request (**API name**) and pick

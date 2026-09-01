@@ -1,4 +1,4 @@
-**Version:** 2.19.16 | **Last Modified:** 2026-07-27
+**Version:** 2.19.17 | **Last Modified:** 2026-09-01
 
 # Features
 
@@ -96,6 +96,7 @@ Postman-style request builder: a `[method ▾] [ URL ] [Send ▾]` request line 
 - **Send Encrypted / Send Plain buttons** — green **Send Encrypted** (AES-encrypt the query string and body first) and purple **Send Plain** (send as-is), shown side by side
 - **📋 Copy menu** — on the response meta line; copies what was actually **sent** (encrypted, when Send Encrypted was used): **URL**, **Body**, **Headers**, **as cURL**, or the **Response** body
 - **📌 Save response** — keep the full response body to revisit later (see **Saved Responses**)
+- **⬇ Download response** — on the response meta line; saves the body to a file exactly as the Body tab shows it (decrypted when it decrypted, raw when it didn't), named after the URL's last path segment + timestamp, `.json` or `.txt` by content type; JSON is pretty-printed (2-space indent) in the saved file
 - **{{env vars}}** — `{{name}}` in the URL / headers / body / token resolves from the active environment at send time (see **Environments**)
 - **Method auto-bump** — typing a body while the method is GET bumps it to POST so bodies aren't silently dropped (GET/HEAD never carry a body)
 - **Params tab** — Postman-style query editor (enable checkbox · Key · Value · Description), two-way bound to the URL

@@ -13,7 +13,7 @@ function exportList() {
   const vis = state.entries.filter((e) => e.row && e.row.style.display !== "none");
   return vis.length ? vis : state.entries;
 }
-function download(filename, text, mime) {
+export function download(filename, text, mime) {
   const blob = new Blob([text], { type: mime || "application/octet-stream" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

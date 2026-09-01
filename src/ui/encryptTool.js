@@ -17,6 +17,7 @@ import {
   loadSavedResponses, addSavedResponse, updateSavedResponses,
 } from "../services/storage.js";
 import * as backup from "../services/backup.js";
+import { download } from "../services/exporter.js";
 import { bodyView } from "./detail.js";
 import { showView, currentView } from "./views.js";
 
@@ -956,15 +957,8 @@ els.backupMenu.addEventListener("click", (e) => {
 });
 
 function downloadBackup() {
-  const blob = new Blob([backup.serialize(collections, history, environments, savedResponses)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `ciphernet-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  download(`ciphernet-backup-${new Date().toISOString().slice(0, 10)}.json`,
+    backup.serialize(collections, history, environments, savedResponses), "application/json");
   flashEnc("Backup downloaded ✓");
 }
 
@@ -1417,8 +1411,35 @@ function respActions(entry) {
   } else {
     wrap.appendChild(el("span", "resp-saved-tag", "🗂 saved"));
   }
+  const dl = el("button", "resp-copy", "⬇ Download");
+  dl.type = "button";
+  dl.title = "Download the response body as a file";
+  dl.addEventListener("click", (e) => { e.stopPropagation(); downloadResponse(entry); });
+  wrap.appendChild(dl);
   wrap.appendChild(respCopyControl(entry));
   return wrap;
+}
+
+// §32 Download Response: saves exactly what the Body tab shows — decrypted when
+// it decrypted, raw otherwise (Copy ▾ → Response still gives the raw text).
+function downloadResponse(entry) {
+  const res = entry.decRes;
+  const text = res && res.ok ? res.text : entry.body;
+  if (!text) { flashEnc("No response body to download.", true); return; }
+  let base = "response";
+  try {
+    base = new URL(entry.url).pathname.split("/").filter(Boolean).pop() || "response";
+  } catch (e) { /* relative/odd URL — keep the fallback */ }
+  base = base.replace(/\.[^.]*$/, "").replace(/[^\w.-]/g, "_") || "response";
+  const ct = ((entry.headers || []).find((h) => h.name.toLowerCase() === "content-type") || {}).value || "";
+  const isJson = /json/i.test(ct) || /^\s*[[{]/.test(text);
+  let out = text;
+  // Pretty-print JSON so the saved file is readable; unparseable text (JSON
+  // content-type on a non-JSON body, a truncated response) goes out as-is.
+  if (isJson) { try { out = JSON.stringify(JSON.parse(text), null, 2); } catch { /* not valid JSON */ } }
+  const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
+  download(`${base}-${stamp}.${isJson ? "json" : "txt"}`, out, isJson ? "application/json" : "text/plain");
+  flashEnc("Response downloaded ✓");
 }
 
 // A "📋 Copy ▾" dropdown for the response meta line: URL / Body / Headers / cURL /
