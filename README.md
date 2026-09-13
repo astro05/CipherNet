@@ -20,23 +20,21 @@ saved via `chrome.storage`). The 16-byte key forces AES-128. The extension
 decrypts with the Web Crypto API, whose AES-CBC uses PKCS7 padding — identical
 to .NET's default — so round-trips match byte-for-byte.
 
-## Install (load unpacked)
+## Installation (Load Unpacked)
 
-1. Open `chrome://extensions`
-2. Toggle **Developer mode** (top-right) on
-3. Click **Load unpacked** and select this folder
-4. Open **DevTools** (F12) on your app → switch to the **"CipherNet"** tab
-5. Trigger an API call. Each request appears with a decrypted
-   **Request Payload**, **Query String**, and **Response**.
+Since this extension is not published on the Chrome Web Store, install it in developer mode:
 
-> Note: Chrome does not allow extensions to modify the *built-in* Network
-> panel's Payload/Response tabs. This extension adds its own panel that mirrors
-> the same requests with decrypted content.
+1. Download or clone this repository.
+2. Open Chrome and navigate to `chrome://extensions`.
+3. Toggle **Developer mode** on (top‑right corner).
+4. Click **Load unpacked**.
+5. Select the **`CipherNet`** folder (the one containing `manifest.json`) — not the repository root.
+6. The **CipherNet** extension will appear in your **Network tab**.
+7. For the key: Go to the **Key tab**, select **Load Key File**, and choose the **ciphernet-key.key** file from the repository root.
 
-> Permissions: the **Disable cache** control uses `declarativeNetRequest` with
-> host access, so Chrome shows a "Read and change all your data on all websites"
-> warning on install. The rule only adds no-cache request headers on the
-> inspected tab; no data ever leaves the browser (offline-first, no telemetry).
+> On Microsoft Edge, use `edge://extensions` and the same **Load unpacked** flow.
+
+To update after pulling new changes, return to `chrome://extensions` and click the **reload** icon on the CipherNet card.
 
 ## Using it (works like the Network tab)
 
