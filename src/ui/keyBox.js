@@ -18,6 +18,7 @@ function flashKey(msg) {
 // stop blinking once a key is set. Called on init and after every save/clear.
 export function refreshKeyIndicator() {
   els.keysToggle.classList.toggle("needs-key", !state.key);
+  els.loadKeyFile.classList.toggle("needs-key", !state.key);
 }
 
 // Decryption results depend on the key, so drop derived caches when it changes.
