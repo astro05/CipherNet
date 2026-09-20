@@ -9,7 +9,9 @@
 
 import { idbGet, idbSet, HANDLE_KEY } from "../services/handleStore.js";
 import { serialize, restoreFromText } from "../services/backup.js";
-import { getCollections, loadHistory } from "../services/storage.js";
+import {
+  getCollections, loadHistory, getEnvironments, loadSavedResponses, loadSettings,
+} from "../services/storage.js";
 import { logError } from "../core/errorLog.js";
 
 const els = {
@@ -53,7 +55,13 @@ async function writeFile(handle, text) {
 async function currentText() {
   const { collections } = await getCollections();
   const history = await loadHistory(); // oldest-first, as the file stores it
-  return serialize(collections || {}, history);
+  const { environments } = await getEnvironments();
+  const savedResponses = await loadSavedResponses();
+  const saved = await loadSettings();
+  return serialize(
+    collections || {}, history, environments, savedResponses,
+    Array.isArray(saved.hideUrlPatterns) ? saved.hideUrlPatterns : [],
+  );
 }
 
 async function showLinked() {

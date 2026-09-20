@@ -32,6 +32,19 @@ appear in the request table.
 * The list is saved as soon as it changes (no debounce), consistent with the
   other More filters toggles.
 
+## Backup file
+
+* The pattern list also rides along in the backup file (§28), so it survives
+  removing and re-adding the extension like Collections and History do.
+* Every change to the list schedules a backup-file write (debounced, same as
+  Collections), in addition to the immediate `chrome.storage.local` save.
+* Restores are non-destructive, matching §28: the file and the live list are
+  **unioned**, with case-insensitive de-duplication, rather than either side
+  being replaced.
+* The automatic pull at panel load and the explicit Restore-from-file both
+  apply the union, and the panel recompiles the matchers and re-applies the
+  filter immediately.
+
 ## Performance
 
 * Patterns are compiled once per edit (substring needles / anchored regexes), so

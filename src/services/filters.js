@@ -6,6 +6,7 @@ import { els } from "../core/els.js";
 import { el } from "../core/dom.js";
 import { hostOf, schemeOf, typeOf, nameOf } from "../core/format.js";
 import { saveSettings } from "./storage.js";
+import { scheduleHideUrlPatterns } from "./backup.js";
 
 /* ----------------------------- filter engine -------------------------- */
 // Recognized `key:value` filters (PRD §5). Anything else is a plain
@@ -368,11 +369,14 @@ els.moreFiltersMenu.querySelectorAll("input[data-mf]").forEach((cb) => {
   });
 });
 // §33 Hide URL patterns: live-filter + save immediately (same reasoning as
-// persistFilters — no debounce that could lose the write when DevTools closes).
+// persistFilters — no debounce that could lose the write when DevTools closes),
+// and mirror the list into the linked backup file (§28) so it survives a
+// remove/re-add.
 els.hideUrlList.addEventListener("input", () => {
   state.hideUrlPatterns = els.hideUrlList.value.split("\n").map((s) => s.trim()).filter(Boolean);
   compileHideUrlMatchers();
   saveSettings({ hideUrlPatterns: state.hideUrlPatterns });
+  scheduleHideUrlPatterns(state.hideUrlPatterns);
   updateMoreFiltersBtn();
   applyFilter();
 });

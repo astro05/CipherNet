@@ -18,6 +18,7 @@ import {
 } from "../services/storage.js";
 import * as backup from "../services/backup.js";
 import { download } from "../services/exporter.js";
+import { syncHideUrlList, updateMoreFiltersBtn, applyFilter } from "../services/filters.js";
 import { bodyView } from "./detail.js";
 import { showView, currentView } from "./views.js";
 
@@ -107,10 +108,20 @@ let currentRef = null;      // { folder, name } of the loaded/saved request, or 
 let currentSnapshot = null; // snapshot() captured at load/save time (for dirty checks)
 
 // Mirror the full backed-up state (collections, history, environments, saved
-// responses) to the linked file. A no-op when none is linked. Everything that
-// mutates any of those four goes through here so the file can't drift.
+// responses, hide-URL patterns) to the linked file. A no-op when none is
+// linked. Everything that mutates any of those goes through here so the file
+// can't drift.
 function scheduleBackup() {
-  backup.scheduleWrite(collections, history, environments, savedResponses);
+  backup.scheduleWrite(collections, history, environments, savedResponses, state.hideUrlPatterns);
+}
+
+// Apply a hide-URL pattern list returned by a backup pull/restore to the live
+// filter state (§33): update state, recompile matchers, re-render, re-filter.
+function applyHideUrlPatterns(patterns) {
+  state.hideUrlPatterns = patterns;
+  syncHideUrlList();
+  updateMoreFiltersBtn();
+  applyFilter();
 }
 
 // Write collections to chrome.storage *and* mirror them to the backup file.
@@ -706,15 +717,17 @@ async function loadStores() {
     savedResponses = await loadSavedResponses();
 
     // Fold the linked backup file in on top of the local stores — this is what
-    // brings collections, history, environments AND saved responses back after a
-    // remove/re-add, with no interaction beyond re-linking the file once.
-    const res = await backup.pullOnLoad(collections, history, environments, savedResponses);
+    // brings collections, history, environments, saved responses AND hide-URL
+    // patterns back after a remove/re-add, with no interaction beyond
+    // re-linking the file once.
+    const res = await backup.pullOnLoad(collections, history, environments, savedResponses, state.hideUrlPatterns);
     if (res.pulled) {
       collections = res.collections;
       history = res.history;
       environments = res.environments;
       if (activeEnv && !environments[activeEnv]) activeEnv = "";
       savedResponses = res.savedResponses;
+      applyHideUrlPatterns(res.hideUrlPatterns || state.hideUrlPatterns);
       updateEnvLabel();
     }
     renderOpenPanels();
@@ -976,7 +989,7 @@ els.backupMenu.addEventListener("click", (e) => {
 
 function downloadBackup() {
   download(`ciphernet-backup-${new Date().toISOString().slice(0, 10)}.json`,
-    backup.serialize(collections, history, environments, savedResponses), "application/json");
+    backup.serialize(collections, history, environments, savedResponses, state.hideUrlPatterns), "application/json");
   flashEnc("Backup downloaded ✓");
 }
 
@@ -994,6 +1007,7 @@ els.backupFile.addEventListener("change", async () => {
     environments = res.environments;
     if (activeEnv && !environments[activeEnv]) activeEnv = "";
     savedResponses = res.savedResponses;
+    applyHideUrlPatterns(res.hideUrlPatterns || state.hideUrlPatterns);
     currentRef = null;
     currentSnapshot = null;
     updateEnvLabel();

@@ -18,10 +18,11 @@
 import {
   getCollections, setCollections, loadHistory, setHistoryBulk,
   getEnvironments, setEnvironmentsMap, loadSavedResponses, updateSavedResponses,
+  loadSettings, saveSettings,
 } from "./storage.js";
 
 const FORMAT = "ciphernet-backup";
-const FORMAT_VERSION = 2; // v2 adds environments + savedResponses (v1 files still load)
+const FORMAT_VERSION = 3; // v3 adds hideUrlPatterns (v1/v2 files still load)
 const HIST_MAX_ITEMS = 100;
 const SAVED_RESP_MAX = 50;
 const WRITE_DEBOUNCE_MS = 600;
@@ -56,7 +57,7 @@ export function unlink() {
 
 /* ------------------------------ file format ------------------------------ */
 
-export function serialize(collections, history, environments, savedResponses) {
+export function serialize(collections, history, environments, savedResponses, hideUrlPatterns) {
   return JSON.stringify({
     format: FORMAT,
     version: FORMAT_VERSION,
@@ -69,11 +70,15 @@ export function serialize(collections, history, environments, savedResponses) {
     // a device has active) — each device picks its own active environment.
     environments: environments || {},
     savedResponses: savedResponses || [],
+    // v3 addition (§33): the Hide URL pattern list, so it survives a
+    // remove/re-add like the rest. No keys/IVs — just the filter lines.
+    hideUrlPatterns: (hideUrlPatterns || []).filter((p) => typeof p === "string").map((p) => p.trim()).filter(Boolean),
   }, null, 2);
 }
 
 // Throws on anything that isn't a backup file, so callers can flag a bad pick.
-// v1 files (no environments/savedResponses) load fine — the fields default empty.
+// v1/v2 files (no environments/savedResponses/hideUrlPatterns) load fine — the
+// fields default empty.
 export function parse(text) {
   let data;
   try { data = JSON.parse(text); } catch { throw new Error("not a JSON file"); }
@@ -82,7 +87,10 @@ export function parse(text) {
   const history = Array.isArray(data.history) ? data.history : [];
   const environments = data.environments && typeof data.environments === "object" ? data.environments : {};
   const savedResponses = Array.isArray(data.savedResponses) ? data.savedResponses : [];
-  return { collections, history, environments, savedResponses };
+  const hideUrlPatterns = Array.isArray(data.hideUrlPatterns)
+    ? data.hideUrlPatterns.filter((p) => typeof p === "string").map((p) => p.trim()).filter(Boolean)
+    : [];
+  return { collections, history, environments, savedResponses, hideUrlPatterns };
 }
 
 /* -------------------------------- merging -------------------------------- */
@@ -138,28 +146,55 @@ export function mergeSavedResponses(local, incoming, preferIncoming) {
     .slice(0, SAVED_RESP_MAX);
 }
 
+// Union of Hide URL patterns (§33). Both sides are kept (restores are
+// non-destructive); duplicates are dropped case-insensitively, since matching
+// itself is case-insensitive. Local order first, incoming appended.
+export function mergeHideUrlPatterns(local, incoming) {
+  const seen = new Set();
+  const out = [];
+  for (const p of [...(local || []), ...(incoming || [])]) {
+    const s = typeof p === "string" ? p.trim() : "";
+    if (!s) continue;
+    const k = s.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(s);
+  }
+  return out;
+}
+
 /* ------------------------------- auto-save ------------------------------- */
-// Every Collections/History change schedules a write. Coalesced, because a
-// rename or a burst of sends would otherwise rewrite the file several times in a
-// row. Silently no-ops when no file is linked — backup is opt-in.
+// Every Collections/History/environments/saved-responses/hide-URL-patterns
+// change schedules a write. Coalesced, because a rename or a burst of sends
+// would otherwise rewrite the file several times in a row. The latest value of
+// each field is kept in a snapshot, so callers that only touch one field (e.g.
+// the §33 pattern list) pass just that one — `undefined` means "unchanged".
+// Silently no-ops when no file is linked — backup is opt-in.
 
 let timer = null;
-let pending = null;
+const snapshot = { collections: null, history: null, environments: null, savedResponses: null, hideUrlPatterns: null };
 
-export function scheduleWrite(collections, history, environments, savedResponses) {
-  pending = { collections, history, environments, savedResponses };
+export function scheduleWrite(collections, history, environments, savedResponses, hideUrlPatterns) {
+  if (collections !== undefined) snapshot.collections = collections;
+  if (history !== undefined) snapshot.history = history;
+  if (environments !== undefined) snapshot.environments = environments;
+  if (savedResponses !== undefined) snapshot.savedResponses = savedResponses;
+  if (hideUrlPatterns !== undefined) snapshot.hideUrlPatterns = hideUrlPatterns;
   if (timer) clearTimeout(timer);
   timer = setTimeout(() => {
     timer = null;
-    const p = pending;
-    pending = null;
-    if (p) writeNow(p.collections, p.history, p.environments, p.savedResponses);
+    writeNow(snapshot.collections, snapshot.history, snapshot.environments, snapshot.savedResponses, snapshot.hideUrlPatterns);
   }, WRITE_DEBOUNCE_MS);
 }
 
+// §33 convenience: the filter engine only knows about the pattern list.
+export function scheduleHideUrlPatterns(hideUrlPatterns) {
+  scheduleWrite(undefined, undefined, undefined, undefined, hideUrlPatterns);
+}
+
 // Resolves { ok, reason } — "not-linked" is the normal, uninteresting case.
-export function writeNow(collections, history, environments, savedResponses) {
-  return send({ type: "backup.write", text: serialize(collections, history, environments, savedResponses) });
+export function writeNow(collections, history, environments, savedResponses, hideUrlPatterns) {
+  return send({ type: "backup.write", text: serialize(collections, history, environments, savedResponses, hideUrlPatterns) });
 }
 
 /* ------------------------- automatic pull on load ------------------------- */
@@ -170,7 +205,7 @@ export function writeNow(collections, history, environments, savedResponses) {
 //
 // Resolves { pulled: false } when there's nothing to do, or
 // { pulled: true, collections, history } with the merged result to render.
-export async function pullOnLoad(localCollections, localHistory, localEnvironments, localSavedResponses) {
+export async function pullOnLoad(localCollections, localHistory, localEnvironments, localSavedResponses, localHideUrlPatterns) {
   const st = await status();
   if (!st || !st.linked || !st.ready) return { pulled: false, status: st };
 
@@ -186,13 +221,15 @@ export async function pullOnLoad(localCollections, localHistory, localEnvironmen
   const history = mergeHistory(localHistory, incoming.history);
   const environments = mergeEnvironments(localEnvironments, incoming.environments, false);
   const savedResponses = mergeSavedResponses(localSavedResponses, incoming.savedResponses, false);
+  const hideUrlPatterns = mergeHideUrlPatterns(localHideUrlPatterns, incoming.hideUrlPatterns);
 
   const collChanged = JSON.stringify(collections) !== JSON.stringify(localCollections || {});
   const histChanged = history.length !== (localHistory || []).length;
   const envChanged = JSON.stringify(environments) !== JSON.stringify(localEnvironments || {});
   const savedChanged = JSON.stringify(savedResponses) !== JSON.stringify(localSavedResponses || []);
-  if (!collChanged && !histChanged && !envChanged && !savedChanged) {
-    return { pulled: true, changed: false, collections, history: localHistory, environments, savedResponses, status: st };
+  const patternsChanged = JSON.stringify(hideUrlPatterns) !== JSON.stringify(localHideUrlPatterns || []);
+  if (!collChanged && !histChanged && !envChanged && !savedChanged && !patternsChanged) {
+    return { pulled: true, changed: false, collections, history: localHistory, environments, savedResponses, hideUrlPatterns, status: st };
   }
 
   if (collChanged) await new Promise((resolve) => setCollections(collections, resolve));
@@ -202,7 +239,8 @@ export async function pullOnLoad(localCollections, localHistory, localEnvironmen
   if (histChanged) storedHistory = (await setHistoryBulk(history.slice().reverse())).reverse(); // storage wants oldest-first
   if (envChanged) await setEnvironmentsMap(environments);
   if (savedChanged) await updateSavedResponses(savedResponses);
-  return { pulled: true, changed: true, collections, history: storedHistory, environments, savedResponses, status: st };
+  if (patternsChanged) saveSettings({ hideUrlPatterns });
+  return { pulled: true, changed: true, collections, history: storedHistory, environments, savedResponses, hideUrlPatterns, status: st };
 }
 
 /* --------------------------- restore from a file -------------------------- */
@@ -214,11 +252,14 @@ export async function restoreFromText(text) {
   const localHistory = await loadHistory();
   const { environments: localEnvironments } = await getEnvironments();
   const localSavedResponses = await loadSavedResponses();
+  const localSettings = await loadSettings();
+  const localHideUrlPatterns = Array.isArray(localSettings.hideUrlPatterns) ? localSettings.hideUrlPatterns : [];
 
   const collections = mergeCollections(localCollections || {}, incoming.collections, true);
   const history = mergeHistory((localHistory || []).slice().reverse(), incoming.history);
   const environments = mergeEnvironments(localEnvironments || {}, incoming.environments, true);
   const savedResponses = mergeSavedResponses(localSavedResponses || [], incoming.savedResponses, true);
+  const hideUrlPatterns = mergeHideUrlPatterns(localHideUrlPatterns, incoming.hideUrlPatterns);
 
   await new Promise((resolve, reject) =>
     setCollections(collections, (err) => (err ? reject(new Error(err)) : resolve()))
@@ -226,6 +267,9 @@ export async function restoreFromText(text) {
   const storedHistory = await setHistoryBulk(history.slice().reverse());
   await setEnvironmentsMap(environments);
   await updateSavedResponses(savedResponses);
+  if (JSON.stringify(hideUrlPatterns) !== JSON.stringify(localHideUrlPatterns)) {
+    saveSettings({ hideUrlPatterns });
+  }
 
   const folders = Object.keys(collections).length;
   const requests = Object.values(collections).reduce((n, f) => n + Object.keys(f).length, 0);
@@ -234,6 +278,7 @@ export async function restoreFromText(text) {
     history: storedHistory.slice().reverse(), // newest-first for the panel
     environments,
     savedResponses,
+    hideUrlPatterns,
     folders,
     requests,
   };

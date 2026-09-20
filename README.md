@@ -1,4 +1,4 @@
-**Version:** 2.19.22 | **Last Modified:** 2026-09-20
+**Version:** 2.19.23 | **Last Modified:** 2026-09-20
 
 ![alt text](assets/image.png)
 # CipherNet (Chrome DevTools extension)
@@ -44,7 +44,7 @@ To update after pulling new changes, return to `chrome://extensions` and click t
 4. **Filter & search** — filter box mini-language, type pills, **More filters ▾**, and full-text **Search** (Ctrl+F), including decrypted bodies. Details: [Filtering](Features.md#filtering) · [Search](Features.md#search).
 5. **Send requests** — **🚀 API Testing**: method + URL, tabs **Params · Authorization · Headers · Body**, then **Send Encrypted** (green) or **Send Plain** (purple). Details: [API Testing Tool](Features.md#api-testing-tool).
 6. **Encrypt/decrypt a value** — **🔐 Encrypt/Decrypt**: paste → **Encrypt** (Ctrl+Shift+Enter) / **Decrypt** (Ctrl+Enter); a pasted URL transforms just its query. Details: [Encrypt/Decrypt Tool](Features.md#encryptdecrypt-tool).
-7. **Keep things** — save requests into **Collections**, reuse `{{variables}}` from **Environments**, pin responses with 📌, lean on **History** and the file **Backup**. Details: [Collections](Features.md#collections-saved-requests) · [Environments](Features.md#environments-variables) · [Saved Responses](Features.md#saved-responses) · [Request History](Features.md#request-history) · [Backup & Restore](Features.md#backup--restore-collections-history-environments--saved-responses).
+7. **Keep things** — save requests into **Collections**, reuse `{{variables}}` from **Environments**, pin responses with 📌, lean on **History** and the file **Backup**. Details: [Collections](Features.md#collections-saved-requests) · [Environments](Features.md#environments-variables) · [Saved Responses](Features.md#saved-responses) · [Request History](Features.md#request-history) · [Backup & Restore](Features.md#backup--restore-collections-history-environments-saved-responses--hide-url-patterns).
 
 **Chrome-style extras** — ● Record / 🗑 clear, Preserve log, Disable cache, Throttling, ⬇ Export (HAR/JSON/CSV/decrypted), resizable splitter, auto light/dark theme. Details: [Network Capture](Features.md#network-capture) · [Network Controls](Features.md#network-controls) · [Export](Features.md#export) · [Layout and Resizing](Features.md#layout-and-resizing) · [Appearance](Features.md#appearance).
 

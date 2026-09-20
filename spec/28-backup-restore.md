@@ -12,7 +12,8 @@ data must be mirrored **outside** the extension, to a file on disk.
 ### Requirements
 
 * The user links a **backup file** once (File System Access API).
-* Every change to Collections or History is written to that file automatically.
+* Every change to Collections, History, Environments, Saved Responses, or the
+  Hide URL pattern list (§33) is written to that file automatically.
 * When the panel opens, the linked file is read and merged back in automatically
   — no interaction beyond having linked the file.
 * After a remove/re-add, re-linking the same file restores everything.

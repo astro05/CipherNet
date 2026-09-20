@@ -1,4 +1,4 @@
-**Version:** 2.19.22 | **Last Modified:** 2026-09-20
+**Version:** 2.19.23 | **Last Modified:** 2026-09-20
 
 # Features
 
@@ -52,17 +52,17 @@
 - **Compact by design** — stores the request (URL/body/token) and a response summary (status/size/time), not the full response body, to stay well inside chrome.storage.sync's 100 KB/8 KB-per-item quota across 100 entries
 - **Bearer token encrypted at rest** — the saved token is AES-GCM ciphertext in storage and in the backup file, decrypted only when loaded back into the composer
 
-## Backup & Restore (Collections, History, Environments & Saved Responses)
+## Backup & Restore (Collections, History, Environments, Saved Responses & Hide URL patterns)
 - **Why it exists** — Chrome erases an extension's storage, `local` **and** `sync` alike, when the extension is removed. (Synced settings only come back for Web Store installs on a signed-in profile; a sideloaded build gets nothing back.) A file on disk is the only copy that survives.
 - **🗄 Backup menu** — in the API Testing toolbar; shows whether a backup file is linked and whether Chrome still permits writing to it
-- **Link backup file** — pick a file once; Collections, History, Environments and Saved Responses are written to it from then on
-- **Automatic save** — every add / rename / delete / send / environment edit / response save writes the file (debounced), so it never lags behind the live store
+- **Link backup file** — pick a file once; Collections, History, Environments, Saved Responses and the Hide URL pattern list are written to it from then on
+- **Automatic save** — every add / rename / delete / send / environment edit / response save / pattern-list edit writes the file (debounced), so it never lags behind the live store
 - **Automatic pull on load** — each time the panel opens, the linked file is read and merged back in, with no interaction
-- **Restore after re-adding the extension** — re-add, open 🗄 Backup → *Link backup file…* → **Open existing backup**, and every folder, request, history entry, environment and saved response comes back
+- **Restore after re-adding the extension** — re-add, open 🗄 Backup → *Link backup file…* → **Open existing backup**, and every folder, request, history entry, environment, saved response and hide-URL pattern comes back
 - **Restore from file** — merge any backup copy into the current data (plain file picker, works in the panel)
 - **Download a copy** — one-off snapshot, e.g. to move your setup to another machine
-- **Non-destructive merges** — a restore unions folders/requests/environments rather than replacing them; history is de-duplicated by timestamp and saved responses by id
-- **v1 files still load** — older backups (Collections + History only) restore fine; the new fields default empty
+- **Non-destructive merges** — a restore unions folders/requests/environments rather than replacing them; history is de-duplicated by timestamp, saved responses by id, and Hide URL patterns case-insensitively
+- **v1/v2 files still load** — older backups (Collections + History, with or without Environments/Saved Responses) restore fine; the new fields default empty
 - **Keys are never backed up** — AES keys and IVs stay in `chrome.storage` and are never written to the file (PRD §24). The file *does* contain Bearer tokens saved with a request (and full response bodies) — the token itself is encrypted at rest (obfuscation via a fixed passphrase, not a secrecy boundary — see PRD §24), so it's not sitting there as plaintext, but the file should still be kept private. A token stored as an **environment variable** value instead of via the Bearer Token field isn't covered by this — environment variables are generic and stay plaintext.
 
 ## Decryption
@@ -118,7 +118,7 @@ Postman-style request builder: a `[method ▾] [ URL ] [Send ▾]` request line 
 - **More filters dropdown** — Hide data URLs, Hide extension URLs, Blocked requests, 3rd-party requests, Blocked response cookies
 - **Hide URL patterns** — paste a list of URLs (one per line) into **More filters ▾** to keep them out of the table, e.g. `https://signal.peopledesk.io/NotificationHub`; a line without `*` matches as a substring (catches query strings), `*` acts as a wildcard, matching is case-insensitive
 - **Resource-type pills** — All · Fetch/XHR · Doc · CSS · JS · Font · Img · Media · Manifest · Socket · Wasm · Other (single or multi-select via Ctrl/Cmd-click)
-- **Filter persistence** — resource-type pill selection, More filters toggles, and the hide-URL pattern list persist via `chrome.storage` and are restored the next time DevTools opens
+- **Filter persistence** — resource-type pill selection, More filters toggles, and the hide-URL pattern list persist via `chrome.storage` and are restored the next time DevTools opens; the hide-URL pattern list also rides along in the backup file, so it survives a remove/re-add
 
 ## Key Management
 - **Clear key** — wipe stored key and restart red blink indicator
