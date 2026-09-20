@@ -17,7 +17,7 @@ import { logError } from "../core/errorLog.js";
 
 const KEYS = [
   "key", "iv", "columns", "layout", "sort",
-  "preserveLog", "disableCache", "throttle", "typeFilters", "moreFilters",
+  "preserveLog", "disableCache", "throttle", "typeFilters", "moreFilters", "hideUrlPatterns",
 ];
 
 // Read all persisted (local, device-scoped) settings at once.

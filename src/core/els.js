@@ -126,4 +126,5 @@ export const els = {
   typeFiltersBar: document.getElementById("typeFilters"),
   moreFiltersBtn: document.getElementById("moreFiltersBtn"),
   moreFiltersMenu: document.getElementById("moreFiltersMenu"),
+  hideUrlList: document.getElementById("hideUrlList"),
 };

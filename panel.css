@@ -154,6 +154,25 @@ body.tool-open #toolbar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .menu-note { padding: 5px 8px; color: var(--muted); white-space: normal; max-width: 240px; }
 .menu-note.ok { color: var(--ok); }
 .menu-note.warn { color: var(--err); }
+/* §33 Hide URL patterns block inside the More filters menu */
+.menu-block { padding: 4px 2px 2px; }
+.menu-label { padding: 2px 6px 4px; color: var(--muted); font-weight: 600; }
+#hideUrlList {
+  display: block;
+  box-sizing: border-box;
+  width: 250px;
+  margin: 0 2px;
+  padding: 4px 6px;
+  resize: vertical;
+  background: var(--bg2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+}
+#hideUrlList:focus { border-color: var(--accent); outline: none; }
 /* the Backup button flags a linked file Chrome has revoked access to */
 #backupBtn.warn { color: var(--err); }
 

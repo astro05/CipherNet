@@ -1,4 +1,4 @@
-**Version:** 2.19.21 | **Last Modified:** 2026-09-01
+**Version:** 2.19.22 | **Last Modified:** 2026-09-20
 
 # Features
 
@@ -116,8 +116,9 @@ Postman-style request builder: a `[method ▾] [ URL ] [Send ▾]` request line 
 - **Custom filter mini-language** — search by method, status, domain, host, scheme, mime-type, protocol, size, headers, running state, cache status, encryption state, API name
 - **Encrypted only toggle** — quickly filter to encrypted requests only
 - **More filters dropdown** — Hide data URLs, Hide extension URLs, Blocked requests, 3rd-party requests, Blocked response cookies
+- **Hide URL patterns** — paste a list of URLs (one per line) into **More filters ▾** to keep them out of the table, e.g. `https://signal.peopledesk.io/NotificationHub`; a line without `*` matches as a substring (catches query strings), `*` acts as a wildcard, matching is case-insensitive
 - **Resource-type pills** — All · Fetch/XHR · Doc · CSS · JS · Font · Img · Media · Manifest · Socket · Wasm · Other (single or multi-select via Ctrl/Cmd-click)
-- **Filter persistence** — resource-type pill selection and More filters toggles persist via `chrome.storage` and are restored the next time DevTools opens
+- **Filter persistence** — resource-type pill selection, More filters toggles, and the hide-URL pattern list persist via `chrome.storage` and are restored the next time DevTools opens
 
 ## Key Management
 - **Clear key** — wipe stored key and restart red blink indicator

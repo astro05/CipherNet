@@ -15,6 +15,9 @@ export const state = {
   // §ImageRequest — Chrome-style resource-type pills + "More filters" toggles.
   typeFilters: new Set(), // selected pill ids; empty == "All"
   moreFilters: { hideData: false, hideExt: false, blockedCookies: false, blockedReq: false, thirdParty: false },
+  // §33 Hide URL patterns: raw persisted lines + compiled matchers ({ sub } / { glob }).
+  hideUrlPatterns: [],
+  hideUrlMatchers: [],
   pageHost: "",
   paused: false,
   entries: [],

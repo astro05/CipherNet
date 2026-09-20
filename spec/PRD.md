@@ -37,5 +37,6 @@ Full requirements are split one file per spec section under `spec/`. Read [00-ov
 | 30 | Request Builder Variables ({{name}}) | [30-request-builder-variables.md](30-request-builder-variables.md) |
 | 31 | Encrypted Key File | [31-key-file.md](31-key-file.md) |
 | 32 | Download Response | [32-download-response.md](32-download-response.md) |
+| 33 | Hide URL Patterns (More filters) | [33-hide-url-patterns.md](33-hide-url-patterns.md) |
 
 When a section's scope or requirements change, edit that section's file directly — this index only tracks the table of contents.

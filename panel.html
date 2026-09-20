@@ -108,6 +108,13 @@
             <label><input type="checkbox" data-mf="blockedCookies" /> Blocked response cookies</label>
             <label><input type="checkbox" data-mf="blockedReq" /> Blocked requests</label>
             <label><input type="checkbox" data-mf="thirdParty" /> 3rd-party requests</label>
+            <div class="menu-sep"></div>
+            <div class="menu-block">
+              <div class="menu-label">Hide URL patterns</div>
+              <textarea id="hideUrlList" rows="4" spellcheck="false"
+                placeholder="One URL per line, e.g.&#10;https://signal.peopledesk.io/NotificationHub"></textarea>
+              <div class="menu-note">Requests matching any line are hidden. Use * as a wildcard.</div>
+            </div>
           </div>
         </div>
         <span class="sep"></span>

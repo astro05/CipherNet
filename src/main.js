@@ -9,7 +9,7 @@ import { els } from "./core/els.js";
 import { logError } from "./core/errorLog.js";
 import { loadSettings } from "./services/storage.js";
 import {
-  renderTypePills, syncMoreFilterChecks, updateMoreFiltersBtn, applyFilter, refreshPageHost,
+  renderTypePills, syncMoreFilterChecks, syncHideUrlList, updateMoreFiltersBtn, applyFilter, refreshPageHost,
 } from "./services/filters.js";
 import {
   populateThrottle, applyThrottleNote, applyDisableCache, applyThrottle,
@@ -61,8 +61,10 @@ function applySettings(saved) {
   // resource-type + more filters
   state.typeFilters = new Set(Array.isArray(saved.typeFilters) ? saved.typeFilters : []);
   Object.assign(state.moreFilters, saved.moreFilters || {});
+  state.hideUrlPatterns = Array.isArray(saved.hideUrlPatterns) ? saved.hideUrlPatterns : [];
   renderTypePills();
   syncMoreFilterChecks();
+  syncHideUrlList();
   updateMoreFiltersBtn();
   applyFilter();
 }

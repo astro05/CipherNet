@@ -233,6 +233,31 @@ function hasBlockedResponseCookies(entry) {
   const list = r && (r._blockedResponseCookies || r._blockedCookies);
   return Array.isArray(list) && list.length > 0;
 }
+
+/* ------------------- hide URL patterns (§33) -------------------------- */
+// One line per pattern. A line with `*` is an anchored, case-insensitive glob
+// (`*` matches any run of characters); a line without `*` is a case-insensitive
+// substring match, so query strings after the pasted URL still get caught.
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function compileUrlPattern(line) {
+  const s = String(line).trim();
+  if (!s) return null;
+  if (s.includes("*")) {
+    return { glob: new RegExp("^" + s.split("*").map(escapeRegExp).join(".*") + "$", "i") };
+  }
+  return { sub: s.toLowerCase() };
+}
+function urlHiddenByPattern(url) {
+  for (const m of state.hideUrlMatchers) {
+    if (m.sub ? url.toLowerCase().includes(m.sub) : m.glob.test(url)) return true;
+  }
+  return false;
+}
+function compileHideUrlMatchers() {
+  state.hideUrlMatchers = state.hideUrlPatterns.map(compileUrlPattern).filter(Boolean);
+}
 function matchesMoreFilters(entry) {
   const mf = state.moreFilters;
   if (mf.hideData && /^data:/i.test(entry.url)) return false;
@@ -240,6 +265,7 @@ function matchesMoreFilters(entry) {
   if (mf.blockedReq && !isBlockedRequest(entry)) return false;
   if (mf.blockedCookies && !hasBlockedResponseCookies(entry)) return false;
   if (mf.thirdParty && state.pageHost && !isThirdParty(entry)) return false;
+  if (state.hideUrlMatchers.length && urlHiddenByPattern(entry.url)) return false;
   return true;
 }
 
@@ -292,7 +318,7 @@ function onTypePill(id, additive) {
   applyFilter();
 }
 export function updateMoreFiltersBtn() {
-  const any = Object.values(state.moreFilters).some(Boolean);
+  const any = Object.values(state.moreFilters).some(Boolean) || state.hideUrlPatterns.length > 0;
   els.moreFiltersBtn.classList.toggle("has-active", any);
 }
 export function syncMoreFilterChecks() {
@@ -300,6 +326,11 @@ export function syncMoreFilterChecks() {
     cb.checked = !!state.moreFilters[cb.dataset.mf];
     cb.closest("label").classList.toggle("active", cb.checked);
   });
+}
+// Restore the hide-URL list into the textarea and (re)compile its matchers.
+export function syncHideUrlList() {
+  compileHideUrlMatchers();
+  els.hideUrlList.value = state.hideUrlPatterns.join("\n");
 }
 export function refreshPageHost() {
   try {
@@ -335,5 +366,14 @@ els.moreFiltersMenu.querySelectorAll("input[data-mf]").forEach((cb) => {
     updateMoreFiltersBtn();
     applyFilter();
   });
+});
+// §33 Hide URL patterns: live-filter + save immediately (same reasoning as
+// persistFilters — no debounce that could lose the write when DevTools closes).
+els.hideUrlList.addEventListener("input", () => {
+  state.hideUrlPatterns = els.hideUrlList.value.split("\n").map((s) => s.trim()).filter(Boolean);
+  compileHideUrlMatchers();
+  saveSettings({ hideUrlPatterns: state.hideUrlPatterns });
+  updateMoreFiltersBtn();
+  applyFilter();
 });
 document.addEventListener("click", () => { els.moreFiltersMenu.hidden = true; });
