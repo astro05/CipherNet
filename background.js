@@ -18,6 +18,21 @@
 import { idbGet, idbDelete, HANDLE_KEY } from "./src/services/handleStore.js";
 import { logError } from "./src/core/errorLog.js";
 
+// §27 cleanup: the DevTools panel enforces Disable cache / Offline via
+// declarativeNetRequest session rules with IDs derived from the tab ID
+// (keep in sync with services/networkControls.js). Port disconnect is the
+// authoritative "panel is gone" signal — it fires even when the panel page is
+// destroyed without pagehide/unload — so this is where the rules get removed
+// and a tab can never stay blocked after DevTools closes.
+function removeTabNetworkRules(tabId) {
+  try {
+    chrome.declarativeNetRequest.updateSessionRules(
+      { removeRuleIds: [tabId * 2 + 1, tabId * 2 + 2] },
+      () => { void chrome.runtime.lastError; }
+    );
+  } catch { /* declarativeNetRequest unavailable — nothing to clean up */ }
+}
+
 const watchers = new Map(); // tabId -> Set<Port>
 
 chrome.runtime.onConnect.addListener((port) => {
@@ -35,7 +50,10 @@ chrome.runtime.onConnect.addListener((port) => {
     const set = watchers.get(tabId);
     if (set) {
       set.delete(port);
-      if (!set.size) watchers.delete(tabId);
+      if (!set.size) {
+        watchers.delete(tabId);
+        removeTabNetworkRules(tabId);
+      }
     }
   });
 });

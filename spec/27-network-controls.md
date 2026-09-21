@@ -93,6 +93,31 @@ Toolbar behavior should match Chrome DevTools as closely as possible, including 
 
 ---
 
+### Rule Enforcement & Cleanup
+
+Because Chrome won't let an extension attach the debugger while DevTools is open, CDP-based
+shaping (`Network.setCacheDisabled`, `Network.emulateNetworkConditions`) is unavailable when the
+panel is active. Enforcement therefore uses `declarativeNetRequest` **session** rules scoped to
+the inspected tab (`tabIds`):
+
+* **Disable cache** → a `modifyHeaders` rule injecting no-cache headers.
+* **Offline** → a `block` rule blocking every resource type, including `main_frame`, so the tab
+  shows Chrome's "This page has been blocked by an extension" page while Offline is active.
+* Bandwidth/latency presets remain informational (a note in the toolbar explains why).
+
+Cleanup requirements (a tab must **never** remain blocked after DevTools goes away):
+
+* Rule IDs are derived from the inspected tab ID (`tabId * 2 + 1` cache, `tabId * 2 + 2` offline),
+  so several panels on different tabs don't overwrite each other's rules.
+* The authoritative cleanup runs in the **background service worker**: when the last live-relay
+  port for a tab disconnects (the panel's context is gone), the worker removes that tab's two
+  session rules. Port disconnect fires reliably even when the panel page is destroyed without
+  `pagehide`/`unload` (closing or undocking DevTools).
+* The panel's own `pagehide` handler removes the same rules as a fallback; double removal is a
+  no-op.
+* On panel reopen the persisted settings re-apply the rules (`applyDisableCache` / `applyThrottle`),
+  so a saved "Offline" selection still blocks while the panel is open.
+
 ### Performance Requirements
 
 * Switching throttle profiles should take effect immediately.

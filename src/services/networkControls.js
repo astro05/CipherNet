@@ -40,8 +40,14 @@ const ALL_RESOURCE_TYPES = [
   "main_frame", "sub_frame", "stylesheet", "script", "image", "font",
   "object", "xmlhttprequest", "ping", "csp_report", "media", "websocket", "other",
 ];
+// §27 Rule IDs are derived from the inspected tab ID so that panels on
+// different tabs don't overwrite each other's session rules, and so the
+// background worker can clean up exactly one dead panel's rules. background.js
+// must keep this derivation in sync.
 const CACHE_RULE_ID = 1;
 const OFFLINE_RULE_ID = 2;
+function cacheRuleId(tabId) { return tabId * 2 + CACHE_RULE_ID; }
+function offlineRuleId(tabId) { return tabId * 2 + OFFLINE_RULE_ID; }
 
 function dnrCtx() {
   const dnr = chrome.declarativeNetRequest;
@@ -53,7 +59,7 @@ function dnrCtx() {
 // §27 Disable cache: inject no-cache request headers for the inspected tab.
 function cacheRule(tabId) {
   return {
-    id: CACHE_RULE_ID,
+    id: cacheRuleId(tabId),
     priority: 1,
     action: {
       type: "modifyHeaders",
@@ -69,7 +75,7 @@ export function applyDisableCache() {
   const ctx = dnrCtx();
   if (!ctx) { els.disableCache.title = "Disable cache is unavailable in this browser"; return; }
   ctx.dnr.updateSessionRules(
-    { removeRuleIds: [CACHE_RULE_ID], addRules: state.disableCache ? [cacheRule(ctx.tabId)] : [] },
+    { removeRuleIds: [cacheRuleId(ctx.tabId)], addRules: state.disableCache ? [cacheRule(ctx.tabId)] : [] },
     () => { void chrome.runtime.lastError; } // swallow unchecked-error warning
   );
 }
@@ -79,7 +85,7 @@ export function applyDisableCache() {
 // shaped without the debugger, so they remain informational.
 function offlineRule(tabId) {
   return {
-    id: OFFLINE_RULE_ID,
+    id: offlineRuleId(tabId),
     priority: 2,
     action: { type: "block" },
     condition: { tabIds: [tabId], resourceTypes: ALL_RESOURCE_TYPES },
@@ -90,7 +96,7 @@ export function applyThrottle() {
   if (!ctx) { els.throttle.title = "Offline throttling is unavailable in this browser"; return; }
   const offline = state.throttle === "offline";
   ctx.dnr.updateSessionRules(
-    { removeRuleIds: [OFFLINE_RULE_ID], addRules: offline ? [offlineRule(ctx.tabId)] : [] },
+    { removeRuleIds: [offlineRuleId(ctx.tabId)], addRules: offline ? [offlineRule(ctx.tabId)] : [] },
     () => { void chrome.runtime.lastError; }
   );
 }
@@ -113,9 +119,11 @@ els.disableCache.addEventListener("change", () => {
 });
 
 // Remove the session rules when the DevTools panel goes away, so a tab is never
-// left permanently blocked / no-cache after DevTools closes. They are re-applied
-// from persisted state when the panel reopens.
+// left permanently blocked / no-cache after DevTools closes. This is only a
+// fallback: `pagehide` does not reliably fire when the panel page is destroyed,
+// so the authoritative cleanup lives in background.js, which removes this tab's
+// rules when the panel's live-relay port disconnects (§27).
 window.addEventListener("pagehide", () => {
   const ctx = dnrCtx();
-  if (ctx) ctx.dnr.updateSessionRules({ removeRuleIds: [CACHE_RULE_ID, OFFLINE_RULE_ID] });
+  if (ctx) ctx.dnr.updateSessionRules({ removeRuleIds: [cacheRuleId(ctx.tabId), offlineRuleId(ctx.tabId)] });
 });

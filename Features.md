@@ -1,4 +1,4 @@
-**Version:** 2.19.24 | **Last Modified:** 2026-09-21
+**Version:** 2.19.25 | **Last Modified:** 2026-09-21
 
 # Features
 
@@ -140,6 +140,7 @@ Postman-style request builder: a `[method ▾] [ URL ] [Send ▾]` request line 
 ## Network Controls
 - **Disable cache** — inject `Cache-Control: no-cache, no-store` / `Pragma: no-cache` headers via `declarativeNetRequest`
 - **Offline mode** — fully functional request blocking (unlike bandwidth presets which are informational)
+- **Auto-cleanup on close** — Disable cache / Offline rules are removed the moment the panel goes away (background-worker port disconnect, not just `pagehide`), so a tab never stays blocked by an extension after DevTools closes
 - **Throttling presets** — Offline, Fast/Slow 5G, Fast/Slow 4G, 3G, Slow 3G (informational only except Offline)
 - **Throttling persistence** — selected preset persists via `chrome.storage`
 
