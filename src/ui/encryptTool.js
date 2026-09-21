@@ -145,7 +145,7 @@ function resolveVars(str) {
   if (typeof str !== "string" || str.indexOf("{{") === -1) return str;
   const vars = (activeEnv && environments[activeEnv]) || null;
   if (!vars) return str;
-  return str.replace(/\{\{\s*([\w.$-]+)\s*\}\}/g, (m, name) =>
+  return str.replace(/\{\{\s*([^{}\s]+)\s*\}\}/g, (m, name) =>
     Object.prototype.hasOwnProperty.call(vars, name) ? vars[name] : m);
 }
 // Names still unresolved after substitution (for a gentle heads-up on send).
@@ -153,7 +153,7 @@ function unresolvedVars(strings) {
   const out = new Set();
   for (const s of strings) {
     if (typeof s !== "string") continue;
-    const m = s.match(/\{\{\s*[\w.$-]+\s*\}\}/g);
+    const m = s.match(/\{\{\s*[^{}\s]+\s*\}\}/g);
     if (m) for (const t of m) out.add(t);
   }
   return [...out];
@@ -311,7 +311,7 @@ function deleteEnv(name) {
 // core/format.js (identical behaviour, with a defensive String() coercion).
 function highlightVarsHtml(text) {
   const vars = (activeEnv && environments[activeEnv]) || {};
-  const re = /\{\{\s*([\w.$-]+)\s*\}\}/g;
+  const re = /\{\{\s*([^{}\s]+)\s*\}\}/g;
   let out = "", last = 0, m;
   while ((m = re.exec(text))) {
     out += escapeHtml(text.slice(last, m.index));
@@ -338,7 +338,7 @@ function varPrefixAtCaret(field) {
   const caret = field.selectionStart;
   if (caret == null) return null;
   const before = field.value.slice(0, caret);
-  const m = before.match(/\{\{\s*([\w.$-]*)$/);
+  const m = before.match(/\{\{\s*([^{}\s]*)$/);
   return m ? { prefix: m[1], start: caret - m[0].length, caret } : null;
 }
 function positionVarSuggest(field) {
@@ -1086,7 +1086,7 @@ function parseQueryPairs(query) {
 // var used as a param key/value stays readable and resolvable in the URL bar
 // instead of getting mangled into %7B%7Bname%7D%7D.
 function encodeQueryPart(str) {
-  const re = /\{\{\s*[\w.$-]+\s*\}\}/g;
+  const re = /\{\{\s*[^{}\s]+\s*\}\}/g;
   let out = "", last = 0, m;
   while ((m = re.exec(str))) {
     out += encodeURIComponent(str.slice(last, m.index)) + m[0];

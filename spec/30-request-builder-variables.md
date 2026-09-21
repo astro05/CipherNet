@@ -13,6 +13,9 @@ time** (the editors keep the `{{name}}` literal, so it's non-destructive).
   **URL, Query Params, Authorization → Bearer Token, Request Headers (key or
   value), and Body.** Unknown names are left as literal `{{name}}` rather than
   blanked, so a typo is visible instead of silently dropped.
+* A variable name is any non-empty string of characters other than `{`, `}`,
+  and whitespace, so URL-flavoured names such as `{{localhost:44380}}` or
+  `{{api/v2}}` work everywhere (highlight, autocomplete, substitution).
 * **Autocomplete** — typing `{{` in any of those fields (URL, Bearer Token,
   Body, or a Params/Headers Key/Value cell) opens a dropdown of the active
   environment's matching variable names (name + current value); ↑/↓ to move,

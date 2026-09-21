@@ -1,4 +1,4 @@
-**Version:** 2.19.23 | **Last Modified:** 2026-09-20
+**Version:** 2.19.24 | **Last Modified:** 2026-09-21
 
 # Features
 
@@ -28,7 +28,7 @@
 
 ## Environments ({{variables}})
 - **🌎 Environment switcher** — pick an active environment in the API Testing toolbar (turns green when one is active); "No Environment" disables substitution
-- **{{name}} substitution** — reference variables as `{{name}}` anywhere in the URL, headers, body, or Bearer token; they're resolved at **send time** (the editors keep the `{{name}}` literal, so it's non-destructive and reusable)
+- **{{name}} substitution** — reference variables as `{{name}}` anywhere in the URL, headers, body, or Bearer token; they're resolved at **send time** (the editors keep the `{{name}}` literal, so it's non-destructive and reusable). Names may contain any characters except `{`, `}`, and spaces — so URL-flavoured names like `{{localhost:44380}}` or `{{api/v2}}` work too
 - **Manage in place** — create / rename / delete environments and edit their `name → value` variables in one pop-panel
 - **Colour-highlighted everywhere** — `{{name}}` renders in a distinct colour right inside the URL, Bearer Token, Body, or any Params/Headers Key/Value cell: blue when the active environment defines it, red when it doesn't
 - **Autocomplete everywhere** — type `{{` in the URL, Bearer Token, Body, or any Params/Headers Key/Value cell and a dropdown of the active environment's variables (name + value) appears; ↑/↓ to move, Enter/Tab or click to insert, Esc to dismiss
